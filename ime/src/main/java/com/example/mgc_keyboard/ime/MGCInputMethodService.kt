@@ -40,13 +40,16 @@ import com.example.mgc_keyboard.ime.tracking.WordCommitListener
 import com.example.mgc_keyboard.alerts.AlertNotifier
 import com.example.mgc_keyboard.alerts.AlertThresholdsStore
 import com.example.mgc_keyboard.alerts.ThresholdMonitor
+import com.example.mgc_keyboard.statscore.DiagLog
 import com.example.mgc_keyboard.statscore.StatsAggregator
 import com.example.mgc_keyboard.statscore.StatsDatabase
 import com.example.mgc_keyboard.statscore.StatsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class MGCInputMethodService : InputMethodService(),
@@ -68,11 +71,14 @@ class MGCInputMethodService : InputMethodService(),
     private lateinit var statsSink:          KeyboardStatsSink
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var periodicFlushJob: Job? = null
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     override fun onCreate() {
         super.onCreate()
+        DiagLog.init(applicationContext)
+        DiagLog.d(TAG, "onCreate")
         val repository = StatsRepository.from(StatsDatabase.getInstance(applicationContext))
         val thresholdMonitor = ThresholdMonitor(repository, AlertNotifier(applicationContext))
         val thresholdsStore = AlertThresholdsStore(applicationContext)
@@ -80,9 +86,14 @@ class MGCInputMethodService : InputMethodService(),
         wordCommitListener = WordCommitListener(SentimentScorer(), aggregator)
         statsSink          = KeyboardStatsSink(aggregator, repository, thresholdMonitor, thresholdsStore)
 
-        // Periodic flush identical to the original service
-        serviceScope.launch {
-            while (true) {
+        // Periodic flush identical to the original service. Tracked in periodicFlushJob and
+        // cancelled in onDestroy() — previously this loop was never stopped, so every
+        // onCreate() (the IME service can be recreated repeatedly, e.g. across lock/unlock
+        // cycles) leaked another infinite loop, each hitting the DB every FLUSH_INTERVAL_MS.
+        // The resulting pile-up of concurrent flush() calls into the same SQLCipher
+        // connection was the root cause of the native crashes seen right after unlocking.
+        periodicFlushJob = serviceScope.launch {
+            while (isActive) {
                 delay(FLUSH_INTERVAL_MS)
                 statsSink.flush()
             }
@@ -118,11 +129,16 @@ class MGCInputMethodService : InputMethodService(),
 
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
+        DiagLog.d(TAG, "onFinishInputView finishingInput=$finishingInput")
         serviceScope.launch { statsSink.flush() }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        DiagLog.d(TAG, "onDestroy")
+        // Stop the periodic loop first so it can't race the final flush below or outlive
+        // this service instance.
+        periodicFlushJob?.cancel()
         serviceScope.launch { statsSink.flush() }
     }
 
@@ -225,6 +241,7 @@ class MGCInputMethodService : InputMethodService(),
     // ── Constants ────────────────────────────────────────────────────────────
 
     private companion object {
+        const val TAG = "MGCInputMethodService"
         const val FLUSH_INTERVAL_MS = 10_000L
         const val MIN_SWITCHER_DP = 48f
     }

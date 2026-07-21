@@ -27,13 +27,13 @@ import com.example.mgc_keyboard.dashboard.charts.Bar
 import com.example.mgc_keyboard.dashboard.charts.BarChart
 
 private val DEFAULT_WEEK_BARS = listOf(
-    Bar(0.55f, MelookColors.Accent),
-    Bar(0.70f, MelookColors.Accent),
-    Bar(0.62f, MelookColors.Accent),
-    Bar(0.85f, MelookColors.Accent),
-    Bar(0.45f, MelookColors.Amber),
-    Bar(0.38f, MelookColors.Amber),
-    Bar(0.30f, MelookColors.Amber)
+    Bar(0.55f, MelookColors.Accent, label = "Mon"),
+    Bar(0.70f, MelookColors.Accent, label = "Tue"),
+    Bar(0.62f, MelookColors.Accent, label = "Wed"),
+    Bar(0.85f, MelookColors.Accent, label = "Thu"),
+    Bar(0.45f, MelookColors.Amber, label = "Fri"),
+    Bar(0.38f, MelookColors.Amber, label = "Sat"),
+    Bar(0.30f, MelookColors.Amber, label = "Sun")
 )
 
 private val WIND_DOWN_STEPS = listOf(

@@ -17,14 +17,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mgc_keyboard.dashboard.MelookColors
+import com.example.mgc_keyboard.dashboard.charts.ChartPoint
 import com.example.mgc_keyboard.dashboard.charts.LineChart
 
-private val DEFAULT_TREND_POINTS = listOf(0.85f, 0.80f, 0.78f, 0.72f, 0.65f, 0.55f, 0.45f, 0.35f)
+private val DEFAULT_TREND_POINTS = listOf(0.85f, 0.80f, 0.78f, 0.72f, 0.65f, 0.55f, 0.45f, 0.35f).map { ChartPoint(it) }
 
 @Composable
 fun TrendsScreen(
     hasEnoughWeeksForTrend: Boolean = true,
-    trendPoints: List<Float> = DEFAULT_TREND_POINTS,
+    trendPoints: List<ChartPoint> = DEFAULT_TREND_POINTS,
     trendDirectionLabel: String = "less active than usual →",
     quietStretchHours: Float = 3.1f,
     quietStretchIncreased: Boolean = true,

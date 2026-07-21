@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mgc_keyboard.dashboard.charts.Bar
+import com.example.mgc_keyboard.dashboard.charts.ChartPoint
+import com.example.mgc_keyboard.dashboard.charts.HeatmapDay
 import com.example.mgc_keyboard.statscore.BehavioralBaseline
 import com.example.mgc_keyboard.statscore.HourlyStat
 import com.example.mgc_keyboard.statscore.StatsDatabase
@@ -17,6 +19,26 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import java.time.LocalDate
+import java.time.format.TextStyle
+import java.util.Locale
+
+/** "Mon", "Tue", ... for the day the given HourlyStat batch falls on (all rows in a batch
+ * share the same day bucket, so the first row's date is enough). */
+private fun List<HourlyStat>.weekdayLabel(): String =
+    firstOrNull()?.let { LocalDate.ofEpochDay(it.dayBucket()).dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH) } ?: ""
+
+/** Blank for most hours — labelling all 24 bars crowds the axis unreadable, so only every
+ * 3rd hour gets a tick, same spacing GitHub/most chart libraries use for dense category axes. */
+private fun hourOfDayLabel(hour: Int): String {
+    if (hour % 3 != 0) return ""
+    return when (hour) {
+        0 -> "12a"
+        12 -> "12p"
+        in 1..11 -> "${hour}a"
+        else -> "${hour - 12}p"
+    }
+}
 
 data class CollectedToday(
     val typingSessions: Int,
@@ -35,18 +57,22 @@ data class DashboardUiState(
     val appVarietyLower: Boolean = true,
     val showSuggestion: Boolean = false,
     val hasEnoughWeeksForTrend: Boolean = false,
-    val trendPoints: List<Float> = emptyList(),
+    val trendPoints: List<ChartPoint> = emptyList(),
     val quietStretchHours: Float = 0f,
     val quietStretchIncreased: Boolean = false,
     // All-stats screen: every collected signal, independent of the 14-day trend gate above.
-    val hourlyActivityPattern: List<Float> = emptyList(),
+    // Phone on/off schedule has 2 view modes sharing this data: hourly shape over the last 7
+    // days, and a per-day total across the last month.
+    val hourlyActivityPattern: List<Bar> = emptyList(),
+    val dailyActivityPatternMonth: List<Bar> = emptyList(),
     val backspaceRateBars: List<Bar> = emptyList(),
-    val sentimentTrendRecent: List<Float> = emptyList(),
+    val sentimentTrendRecent: List<ChartPoint> = emptyList(),
     val appSwitchBars: List<Bar> = emptyList(),
     val appVarietyBars: List<Bar> = emptyList(),
     val totalKeyPressesToday: Int = 0,
     val totalBackspacesToday: Int = 0,
-    val totalWordsScoredToday: Int = 0
+    val totalWordsScoredToday: Int = 0,
+    val heatmapDays: List<HeatmapDay> = emptyList()
 )
 
 /** US3-1/2/5: reads StatsRepository + BehavioralBaseline and derives the numbers each screen
@@ -61,13 +87,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     init {
         combine(
             repository.observeRecentHours(24 * 14),
-            repository.observeBaseline()
-        ) { recentHours, baseline -> recentHours to baseline }
-            .onEach { (recentHours, baseline) -> update(recentHours, baseline) }
+            repository.observeBaseline(),
+            // Wider, separate window purely for the heatmap so it doesn't distort the
+            // 14-day-windowed metrics (trendPoints etc.) computed from the first flow.
+            repository.observeRecentHours(24 * 98)
+        ) { recentHours, baseline, heatmapHours -> Triple(recentHours, baseline, heatmapHours) }
+            .onEach { (recentHours, baseline, heatmapHours) -> update(recentHours, baseline, heatmapHours) }
             .launchIn(viewModelScope)
     }
 
-    private fun update(recentHours: List<HourlyStat>, baseline: BehavioralBaseline?) {
+    private fun update(recentHours: List<HourlyStat>, baseline: BehavioralBaseline?, heatmapHours: List<HourlyStat>) {
         val byDay = recentHours.groupBy { it.dayBucket() }
         val today = byDay.values.maxByOrNull { day -> day.maxOf { it.hourBucket } }.orEmpty()
 
@@ -106,7 +135,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 val busy = day.sumOf { it.totalKeyPresses }.coerceAtLeast(1)
                 val fraction = (busy.toFloat() / maxDailyKeyPresses).coerceIn(0.1f, 1f)
                 val isRecent = index >= lastSevenDays.size - 3
-                Bar(fraction, if (isRecent) MelookColors.Amber else MelookColors.Accent)
+                Bar(fraction, if (isRecent) MelookColors.Amber else MelookColors.Accent, label = day.weekdayLabel(), value = busy.toFloat())
             }
 
             val lateNightHours = recentHours.filter { (it.hourBucket % 24) in 22..23 || (it.hourBucket % 24) in 0..4 }
@@ -124,15 +153,42 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 if (stat.isInactive()) (current + 1) to maxOf(longest, current + 1) else 0 to longest
             }.second
 
-        // Phone on/off schedule: average screen time per hour-of-day (0-23), normalized to
-        // the busiest hour so the shape of the day is visible regardless of absolute usage.
-        val byHourOfDay = recentHours.groupBy { (it.hourBucket % 24).toInt() }
+        // Phone on/off schedule, mode 1: average screen time per hour-of-day (0-23) across
+        // the last 7 days only, normalized to the busiest hour so the shape of the day is
+        // visible regardless of absolute usage.
+        val last7DayBuckets = byDay.entries.sortedByDescending { it.key }.take(7).map { it.key }.toSet()
+        val last7DaysHours = recentHours.filter { it.dayBucket() in last7DayBuckets }
+        val byHourOfDay = last7DaysHours.groupBy { (it.hourBucket % 24).toInt() }
         val maxAvgScreenTime = (0..23).maxOfOrNull { hour ->
             byHourOfDay[hour]?.map { it.screenTimeMillis }?.average() ?: 0.0
         }?.coerceAtLeast(1.0) ?: 1.0
         val hourlyActivityPattern = (0..23).map { hour ->
             val avg = byHourOfDay[hour]?.map { it.screenTimeMillis }?.average() ?: 0.0
-            (avg / maxAvgScreenTime).toFloat().coerceIn(0f, 1f)
+            val fraction = (avg / maxAvgScreenTime).toFloat().coerceIn(0f, 1f)
+            Bar(
+                heightFraction = fraction.coerceAtLeast(0.05f),
+                color = MelookColors.Accent,
+                label = hourOfDayLabel(hour),
+                value = (avg / 60_000.0).toFloat() // minutes of screen time
+            )
+        }
+
+        // Phone on/off schedule, mode 2: total screen time per calendar day across the last
+        // month, drawn from the wider heatmap window so it isn't capped at 14 days.
+        val byDayMonth = heatmapHours.groupBy { it.dayBucket() }
+        val lastMonthDaysAsc = byDayMonth.entries.sortedByDescending { it.key }.take(30).map { it }.reversed()
+        val maxDailyScreenTime = lastMonthDaysAsc.maxOfOrNull { (_, hours) -> hours.sumOf { it.screenTimeMillis } }
+            ?.coerceAtLeast(1) ?: 1
+        val dailyActivityPatternMonth = lastMonthDaysAsc.mapIndexed { index, (dayEpoch, hours) ->
+            val total = hours.sumOf { it.screenTimeMillis }
+            val fraction = (total.toFloat() / maxDailyScreenTime).coerceIn(0.05f, 1f)
+            Bar(
+                heightFraction = fraction,
+                color = MelookColors.Accent,
+                // Every 30 bars fit poorly with a label each — thin to every 5th, same reasoning as hourOfDayLabel.
+                label = if (index % 5 == 0) LocalDate.ofEpochDay(dayEpoch).dayOfMonth.toString() else "",
+                value = (total / 60_000.0).toFloat() // minutes of screen time
+            )
         }
 
         val lastSevenDaysAsc = byDay.entries.sortedByDescending { it.key }.take(7).map { it.value }.reversed()
@@ -143,24 +199,44 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val backspaceRateBars = lastSevenDaysAsc.map { day ->
             val rate = day.filter { it.totalKeyPresses > 0 }.map { it.backspaceRate() }.average()
                 .let { if (it.isNaN()) 0.0 else it }
-            Bar((rate / maxBackspaceRate).toFloat().coerceIn(0.05f, 1f), MelookColors.Accent)
+            Bar(
+                (rate / maxBackspaceRate).toFloat().coerceIn(0.05f, 1f),
+                MelookColors.Accent,
+                label = day.weekdayLabel(),
+                value = (rate * 100).toFloat() // percent
+            )
         }
 
         val sentimentTrendRecent = lastSevenDaysAsc.map { day ->
-            day.mapNotNull { it.averageSentiment() }.average()
+            val score = day.mapNotNull { it.averageSentiment() }.average()
                 .let { if (it.isNaN()) 0.5 else it }.toFloat().coerceIn(0f, 1f)
+            ChartPoint(value = score, label = day.weekdayLabel())
         }
 
         val maxAppSwitches = lastSevenDaysAsc.maxOfOrNull { day -> day.sumOf { it.appSwitchCount } }?.coerceAtLeast(1) ?: 1
         val appSwitchBars = lastSevenDaysAsc.map { day ->
             val switches = day.sumOf { it.appSwitchCount }.coerceAtLeast(0)
-            Bar((switches.toFloat() / maxAppSwitches).coerceIn(0.05f, 1f), MelookColors.Amber)
+            Bar(
+                (switches.toFloat() / maxAppSwitches).coerceIn(0.05f, 1f),
+                MelookColors.Amber,
+                label = day.weekdayLabel(),
+                value = switches.toFloat()
+            )
         }
 
         val maxAppVariety = lastSevenDaysAsc.maxOfOrNull { day -> day.sumOf { it.distinctAppCount } }?.coerceAtLeast(1) ?: 1
         val appVarietyBars = lastSevenDaysAsc.map { day ->
             val variety = day.sumOf { it.distinctAppCount }.coerceAtLeast(0)
-            Bar((variety.toFloat() / maxAppVariety).coerceIn(0.05f, 1f), MelookColors.Green)
+            Bar(
+                (variety.toFloat() / maxAppVariety).coerceIn(0.05f, 1f),
+                MelookColors.Green,
+                label = day.weekdayLabel(),
+                value = variety.toFloat()
+            )
+        }
+
+        val heatmapDays = heatmapHours.groupBy { it.dayBucket() }.map { (dayEpoch, hours) ->
+            HeatmapDay(dayEpoch = dayEpoch, value = hours.sumOf { it.totalKeyPresses }.toFloat())
         }
 
         _state.value = DashboardUiState(
@@ -175,21 +251,24 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             hasEnoughWeeksForTrend = byDay.size >= 14,
             trendPoints = if (byDay.size >= 14) {
                 byDay.entries.sortedBy { it.key }.map { (_, day) ->
-                    day.mapNotNull { it.averageSentiment() }.average()
+                    val score = day.mapNotNull { it.averageSentiment() }.average()
                         .let { if (it.isNaN()) 0.5f else it.toFloat() }
                         .coerceIn(0f, 1f)
+                    ChartPoint(value = score, label = day.weekdayLabel())
                 }
             } else emptyList(),
             quietStretchHours = longestInactiveStretchHours.toFloat(),
             quietStretchIncreased = baseline != null && longestInactiveStretchHours > baseline.avgLongestInactiveStretchHours,
             hourlyActivityPattern = hourlyActivityPattern,
+            dailyActivityPatternMonth = dailyActivityPatternMonth,
             backspaceRateBars = backspaceRateBars,
             sentimentTrendRecent = sentimentTrendRecent,
             appSwitchBars = appSwitchBars,
             appVarietyBars = appVarietyBars,
             totalKeyPressesToday = today.sumOf { it.totalKeyPresses },
             totalBackspacesToday = today.sumOf { it.backspacePresses },
-            totalWordsScoredToday = today.sumOf { it.wordsScored }
+            totalWordsScoredToday = today.sumOf { it.wordsScored },
+            heatmapDays = heatmapDays
         )
     }
 }

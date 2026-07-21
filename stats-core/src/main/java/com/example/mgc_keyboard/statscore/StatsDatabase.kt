@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 @Database(
     entities = [HourlyStat::class, BehavioralBaseline::class, WithdrawalSignal::class, AuditLogEntry::class],
@@ -24,18 +23,13 @@ abstract class StatsDatabase : RoomDatabase() {
                 instance ?: build(context).also { instance = it }
             }
 
-        private fun build(context: Context): StatsDatabase {
-            System.loadLibrary("sqlcipher")
-            val passphrase = DbPassphrase.getOrCreate(context.applicationContext)
-            val factory = SupportOpenHelperFactory(passphrase)
-            return Room.databaseBuilder(
+        private fun build(context: Context): StatsDatabase =
+            Room.databaseBuilder(
                 context.applicationContext,
                 StatsDatabase::class.java,
                 "mental_melook_stats.db"
             )
-                .openHelperFactory(factory)
                 .fallbackToDestructiveMigration(true)
                 .build()
-        }
     }
 }

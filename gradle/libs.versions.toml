@@ -15,8 +15,6 @@ navigationCompose = "2.9.8"
 workRuntimeKtx = "2.11.2"
 datastorePreferences = "1.1.7"
 kotlinxCoroutinesCore = "1.10.2"
-sqlcipherAndroid = "4.7.0"
-securityCrypto = "1.1.0"
 okhttp = "4.12.0"
 robolectric = "4.13"
 jsonOrg = "20231013"
@@ -25,8 +23,6 @@ jsonOrg = "20231013"
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 json-org = { group = "org.json", name = "json", version.ref = "jsonOrg" }
-sqlcipher-android = { group = "net.zetetic", name = "sqlcipher-android", version.ref = "sqlcipherAndroid" }
-androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

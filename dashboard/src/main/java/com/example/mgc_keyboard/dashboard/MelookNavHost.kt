@@ -217,7 +217,7 @@ fun MelookNavHost(navController: NavHostController = rememberNavController()) {
             Box(Modifier.fillMaxSize()) {
                 TrendsScreen(
                     hasEnoughWeeksForTrend = state.hasEnoughWeeksForTrend,
-                    trendPoints = state.trendPoints.ifEmpty { listOf(0.5f) },
+                    trendPoints = state.trendPoints.ifEmpty { listOf(com.example.mgc_keyboard.dashboard.charts.ChartPoint(0.5f)) },
                     quietStretchHours = state.quietStretchHours,
                     quietStretchIncreased = state.quietStretchIncreased,
                     daysOfDataCollected = state.daysOfDataCollected,
@@ -250,10 +250,12 @@ fun MelookNavHost(navController: NavHostController = rememberNavController()) {
             val state by dashboardViewModel.state.collectAsState()
             AllStatsScreen(
                 hourlyActivityPattern = state.hourlyActivityPattern,
+                dailyActivityPatternMonth = state.dailyActivityPatternMonth,
                 backspaceRateBars = state.backspaceRateBars,
                 sentimentTrendRecent = state.sentimentTrendRecent,
                 appSwitchBars = state.appSwitchBars,
                 appVarietyBars = state.appVarietyBars,
+                heatmapDays = state.heatmapDays,
                 totalKeyPressesToday = state.totalKeyPressesToday,
                 totalBackspacesToday = state.totalBackspacesToday,
                 totalWordsScoredToday = state.totalWordsScoredToday,

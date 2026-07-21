@@ -10,24 +10,34 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mgc_keyboard.dashboard.MelookColors
 import com.example.mgc_keyboard.dashboard.charts.Bar
 import com.example.mgc_keyboard.dashboard.charts.BarChart
+import com.example.mgc_keyboard.dashboard.charts.ChartPoint
+import com.example.mgc_keyboard.dashboard.charts.GithubHeatmap
+import com.example.mgc_keyboard.dashboard.charts.HeatmapDay
 import com.example.mgc_keyboard.dashboard.charts.LineChart
 
 /** Everything currently collected on-device (README §4.1/§4.3), in one place — not just the
  * narrative insight cards on the summary/trends screens. All figures are local-only. */
 @Composable
 fun AllStatsScreen(
-    hourlyActivityPattern: List<Float>,
+    hourlyActivityPattern: List<Bar>,
+    dailyActivityPatternMonth: List<Bar>,
     backspaceRateBars: List<Bar>,
-    sentimentTrendRecent: List<Float>,
+    sentimentTrendRecent: List<ChartPoint>,
     appSwitchBars: List<Bar>,
     appVarietyBars: List<Bar>,
+    heatmapDays: List<HeatmapDay>,
     totalKeyPressesToday: Int,
     totalBackspacesToday: Int,
     totalWordsScoredToday: Int,
@@ -61,13 +71,26 @@ fun AllStatsScreen(
             TodayTotalsRow(totalKeyPressesToday, totalBackspacesToday, totalWordsScoredToday)
             Spacer(Modifier.height(20.dp))
 
+            var phoneScheduleModeIsHourly by remember { mutableStateOf(true) }
             StatCard(
                 title = "Phone on/off schedule",
-                subtitle = "Average screen-on time by hour of day (last 2 weeks), tallest = busiest hour"
+                subtitle = if (phoneScheduleModeIsHourly)
+                    "Average screen-on time by hour of day (last 7 days), tallest = busiest hour"
+                else
+                    "Total screen-on time per day (last month)"
             ) {
-                val hourlyBars = hourlyActivityPattern.ifEmpty { List(24) { 0.05f } }
-                    .map { Bar(it.coerceAtLeast(0.05f), MelookColors.Accent) }
-                BarChart(bars = hourlyBars)
+                ModeToggle(
+                    leftLabel = "Hourly · 7 days",
+                    rightLabel = "Daily · month",
+                    leftSelected = phoneScheduleModeIsHourly,
+                    onSelect = { phoneScheduleModeIsHourly = it }
+                )
+                Spacer(Modifier.height(8.dp))
+                if (phoneScheduleModeIsHourly) {
+                    BarChart(bars = hourlyActivityPattern.ifEmpty { List(24) { Bar(0.05f, MelookColors.Accent) } })
+                } else {
+                    BarChart(bars = dailyActivityPatternMonth.ifEmpty { List(30) { Bar(0.05f, MelookColors.Accent) } })
+                }
             }
             Spacer(Modifier.height(16.dp))
 
@@ -83,7 +106,7 @@ fun AllStatsScreen(
                 title = "Typing sentiment",
                 subtitle = "On-device sentiment score of what you type, per day (last 7 days)"
             ) {
-                LineChart(points = sentimentTrendRecent.ifEmpty { List(7) { 0.5f } })
+                LineChart(points = sentimentTrendRecent.ifEmpty { List(7) { ChartPoint(0.5f) } })
             }
             Spacer(Modifier.height(16.dp))
 
@@ -100,6 +123,14 @@ fun AllStatsScreen(
                 subtitle = "Number of distinct apps used, per day (last 7 days)"
             ) {
                 BarChart(bars = appVarietyBars.ifEmpty { List(7) { Bar(0.05f, MelookColors.Green) } })
+            }
+            Spacer(Modifier.height(16.dp))
+
+            StatCard(
+                title = "Activity heatmap",
+                subtitle = "Key presses per day (last ~14 weeks) — darker means busier"
+            ) {
+                GithubHeatmap(days = heatmapDays)
             }
 
             Spacer(Modifier.height(24.dp))
@@ -138,6 +169,37 @@ private fun TotalPill(label: String, value: String, modifier: Modifier = Modifie
             Text(value, color = MelookColors.TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Text(label, color = MelookColors.TextGray, fontSize = 10.sp)
         }
+    }
+}
+
+@Composable
+private fun ModeToggle(leftLabel: String, rightLabel: String, leftSelected: Boolean, onSelect: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(MelookColors.Surface)
+            .padding(2.dp)
+    ) {
+        ModeToggleChip(leftLabel, selected = leftSelected, onClick = { onSelect(true) }, modifier = Modifier.weight(1f))
+        ModeToggleChip(rightLabel, selected = !leftSelected, onClick = { onSelect(false) }, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun ModeToggleChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = if (selected) MelookColors.Accent else MelookColors.Surface,
+        modifier = modifier.clickable(onClick = onClick)
+    ) {
+        Text(
+            label,
+            color = if (selected) androidx.compose.ui.graphics.Color.White else MelookColors.TextGray,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+        )
     }
 }
 
