@@ -23,8 +23,11 @@ android {
 
     buildTypes {
         release {
+            // Debug-signed release build purely so a shrunk (minified) APK can be shared for
+            // testing — not a real signed release. Reuses the auto-generated debug keystore.
+            signingConfig = signingConfigs.getByName("debug")
             optimization {
-                enable = false
+                enable = true
             }
         }
     }
