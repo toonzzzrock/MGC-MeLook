@@ -1,1 +1,6 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Only used when the user opts in to Settings > Clinical Bridge; the app
+         defaults to fully offline/local and makes no network calls otherwise. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>
+

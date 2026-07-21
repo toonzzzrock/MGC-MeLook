@@ -29,4 +29,6 @@ dependencies {
     api(libs.kotlinx.coroutines.core)
     api(libs.sqlcipher.android)
     implementation(libs.androidx.security.crypto)
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

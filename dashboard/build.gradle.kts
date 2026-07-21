@@ -22,6 +22,9 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
@@ -29,6 +32,7 @@ dependencies {
     implementation(project(":alerts"))
     implementation(project(":usage-monitor"))
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.okhttp)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
@@ -39,4 +43,9 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.json.org)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.junit)
 }
