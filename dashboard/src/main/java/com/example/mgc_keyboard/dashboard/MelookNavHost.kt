@@ -218,6 +218,7 @@ fun MelookNavHost(navController: NavHostController = rememberNavController()) {
                 TrendsScreen(
                     hasEnoughWeeksForTrend = state.hasEnoughWeeksForTrend,
                     trendPoints = state.trendPoints.ifEmpty { listOf(com.example.mgc_keyboard.dashboard.charts.ChartPoint(0.5f)) },
+                    trendDirectionLabel = state.trendDirectionLabel,
                     quietStretchHours = state.quietStretchHours,
                     quietStretchIncreased = state.quietStretchIncreased,
                     daysOfDataCollected = state.daysOfDataCollected,
@@ -244,7 +245,9 @@ fun MelookNavHost(navController: NavHostController = rememberNavController()) {
             )
         }
         composable(MelookRoutes.DATA_SHARING) {
-            DataSharingScreen(onBack = { navController.popBackStack() })
+            val bridgePrefsStore = remember { com.example.mgc_keyboard.dashboard.bridge.ClinicalBridgePreferences(context) }
+            val bridgeState by bridgePrefsStore.state.collectAsState(initial = com.example.mgc_keyboard.dashboard.bridge.ClinicalBridgeState())
+            DataSharingScreen(bridgeState = bridgeState, onBack = { navController.popBackStack() })
         }
         composable(MelookRoutes.ALL_STATS) {
             val state by dashboardViewModel.state.collectAsState()
@@ -259,6 +262,7 @@ fun MelookNavHost(navController: NavHostController = rememberNavController()) {
                 totalKeyPressesToday = state.totalKeyPressesToday,
                 totalBackspacesToday = state.totalBackspacesToday,
                 totalWordsScoredToday = state.totalWordsScoredToday,
+                currentHour = state.currentHour,
                 onBack = { navController.popBackStack() }
             )
         }

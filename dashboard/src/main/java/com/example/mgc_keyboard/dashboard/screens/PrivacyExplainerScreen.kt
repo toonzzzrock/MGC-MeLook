@@ -49,7 +49,7 @@ fun PrivacyExplainerScreen(standalone: Boolean = false, onContinue: () -> Unit) 
             lines = listOf(
                 "The words or messages you type",
                 "Call or message content",
-                "Anything sent off your device — this app has no internet permission"
+                "Anything sent off your device — unless you turn on Clinical Bridge in Settings, and even then, only the numbers above, never your typed text"
             ),
             positive = false
         )

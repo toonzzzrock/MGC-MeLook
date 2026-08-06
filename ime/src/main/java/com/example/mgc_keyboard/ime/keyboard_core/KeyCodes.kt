@@ -19,5 +19,10 @@ object KeyCodes {
     const val SHIFT_LOCK = -14  // caps-lock (double-tap shift)
     const val MODE_SYMBOLS = -2  // switch to symbols/numbers layer
     const val MODE_ALPHABET = -99 // switch back to alpha layer
-    const val EMOJI = -100       // emoji key (no-op for now)
+    const val MODE_CLIPBOARD = -102 // switch to clipboard/edit-actions layer
+    const val EMOJI = -100       // switch to emoji layer
+    const val COPY = -6
+    const val PASTE = -7
+    const val CUT = -8
+    const val SELECT_ALL = -9
 }

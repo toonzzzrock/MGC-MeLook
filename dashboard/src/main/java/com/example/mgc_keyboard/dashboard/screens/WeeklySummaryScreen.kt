@@ -25,6 +25,8 @@ import com.example.mgc_keyboard.dashboard.CollectedToday
 import com.example.mgc_keyboard.dashboard.MelookColors
 import com.example.mgc_keyboard.dashboard.charts.Bar
 import com.example.mgc_keyboard.dashboard.charts.BarChart
+import com.example.mgc_keyboard.dashboard.charts.ChartCitations
+import com.example.mgc_keyboard.dashboard.charts.ChartInfoButton
 
 private val DEFAULT_WEEK_BARS = listOf(
     Bar(0.55f, MelookColors.Accent, label = "Mon"),
@@ -161,7 +163,11 @@ fun WeeklySummaryScreen(
                 Text("Your typing pace $paceWord ${kotlin.math.abs(paceChangePercent)}%", color = MelookColors.TextDark, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 Text("compared with your usual pace", color = MelookColors.TextGray, fontSize = 12.sp)
                 Spacer(Modifier.height(14.dp))
-                Text("baseline", color = MelookColors.TextGray, fontSize = 10.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Key presses per day this week", color = MelookColors.TextGray, fontSize = 10.sp)
+                    Spacer(Modifier.weight(1f))
+                    ChartInfoButton(ChartCitations.TYPING_PACE)
+                }
                 BarChart(bars = weekBars)
             }
         }

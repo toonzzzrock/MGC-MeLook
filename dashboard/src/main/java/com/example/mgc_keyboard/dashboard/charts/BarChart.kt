@@ -15,7 +15,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
@@ -33,7 +32,6 @@ data class Bar(
 fun BarChart(
     bars: List<Bar>,
     modifier: Modifier = Modifier,
-    baselineColor: Color = Color(0xFFB9C6E8),
     axisLabelColor: Color = Color(0xFF8A8FA3),
     valueFormatter: (Float) -> String = { it.formatAxisValue() }
 ) {
@@ -79,16 +77,6 @@ fun BarChart(
         val barWidth = (plotWidth - gap * (barCount - 1)) / barCount
 
         val maxValue = bars.maxOf { it.value }.let { if (it <= 0f) 1f else it }
-
-        // baseline near the top of the plot area
-        val baselineY = plotTop + plotHeight * 0.15f
-        drawLine(
-            color = baselineColor,
-            start = Offset(plotLeft, baselineY),
-            end = Offset(plotRight, baselineY),
-            strokeWidth = 2f,
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f))
-        )
 
         bars.forEachIndexed { i, bar ->
             val barHeight = plotHeight * bar.heightFraction

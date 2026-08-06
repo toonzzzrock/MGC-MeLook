@@ -14,9 +14,9 @@ import kotlinx.coroutines.sync.withLock
  *
  * flush() is called from three independent triggers (the periodic timer, onFinishInputView,
  * onDestroy) that can overlap in time. A Mutex serializes them — concurrent suspend-fun
- * calls into the same SQLCipher-backed Room connection previously caused native crashes
- * (SIGSEGV in SQLCipher's disk-IO threads) when two flushes landed back to back, e.g. during
- * the rapid IME create/destroy cycling that happens while unlocking the device. */
+ * calls into the same Room/SQLite connection previously caused native crashes (SIGSEGV in
+ * SQLite's disk-IO threads) when two flushes landed back to back, e.g. during the rapid IME
+ * create/destroy cycling that happens while unlocking the device. */
 class KeyboardStatsSink(
     private val aggregator: StatsAggregator,
     private val repository: StatsRepository,

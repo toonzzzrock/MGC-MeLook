@@ -13,7 +13,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
@@ -31,7 +30,6 @@ fun LineChart(
     points: List<ChartPoint>,
     modifier: Modifier = Modifier,
     lineColor: Color = Color(0xFF3B6FF2),
-    dashedReferenceColor: Color = Color(0xFFE0A63C),
     axisLabelColor: Color = Color(0xFF8A8FA3),
     valueFormatter: (Float) -> String = { it.formatAxisValue() }
 ) {
@@ -92,17 +90,6 @@ fun LineChart(
             drawCircle(color = lineColor, radius = if (isSelected) 9f else 6f, center = p)
         }
 
-        // dashed reference/baseline line — spans the full plot width so it reads as a
-        // reference for every point, not just the last few.
-        val refY = plotTop + plotHeight * 0.72f
-        drawLine(
-            color = dashedReferenceColor,
-            start = Offset(plotLeft, refY),
-            end = Offset(plotRight, refY),
-            strokeWidth = 3f,
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f))
-        )
-
         points.forEachIndexed { i, p ->
             if (p.label.isNotEmpty()) {
                 drawContext.canvas.nativeCanvas.drawText(
@@ -134,6 +121,16 @@ fun LineChart(
             )
         }
     }
+}
+
+/** Sentiment scores are a unitless 0..1 scale — a bare "0.62" tells the user nothing about
+ * whether that's good or bad, so axis and tooltip both go through this instead. */
+fun sentimentLabel(value: Float): String = when {
+    value <= 0.05f -> "negative"
+    value >= 0.95f -> "positive"
+    value < 0.4f -> "leaning negative (%.2f)".format(value)
+    value > 0.6f -> "leaning positive (%.2f)".format(value)
+    else -> "neutral (%.2f)".format(value)
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLineChartTooltip(

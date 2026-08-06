@@ -20,9 +20,12 @@
  *   Tap Shift again    → CAPS_LOCK → NONE
  *   Any letter key     → if SHIFTED, auto-resets to NONE after commit
  *
- * Symbols switch:
- *   123 key → switch to symbols layer (isAlphaMode = false)
- *   ABC key → switch back to alpha layer (isAlphaMode = true)
+ * Layer switching (KeyboardMode: ALPHA / SYMBOLS / EMOJI / CLIPBOARD):
+ *   123 key   → SYMBOLS   (has digits + a 📋 key back to CLIPBOARD)
+ *   ABC key   → ALPHA
+ *   😊 key    → EMOJI
+ *   📋 key    → CLIPBOARD (Copy / Paste / Cut / Select all)
+ *   Numeric/phone/datetime input fields open directly in SYMBOLS.
  */
 package com.example.mgc_keyboard.ime
 
@@ -122,9 +125,12 @@ class MGCInputMethodService : InputMethodService(),
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         wordBuffer.clear()
-        // Reset to alpha layout and clear shift on each new input field
-        keyboardView.isAlphaMode = true
-        keyboardView.shiftState  = MGCKeyboardView.ShiftState.NONE
+        // Reset shift on each new input field. Numeric/phone/datetime fields open straight
+        // on the symbols layer (it already has a digit row) instead of forcing a 123 tap.
+        val numberLike = info?.inputType?.let { it and android.text.InputType.TYPE_MASK_CLASS } in
+            setOf(android.text.InputType.TYPE_CLASS_NUMBER, android.text.InputType.TYPE_CLASS_PHONE, android.text.InputType.TYPE_CLASS_DATETIME)
+        keyboardView.mode = if (numberLike) MGCKeyboardView.KeyboardMode.SYMBOLS else MGCKeyboardView.KeyboardMode.ALPHA
+        keyboardView.shiftState = MGCKeyboardView.ShiftState.NONE
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -177,29 +183,41 @@ class MGCInputMethodService : InputMethodService(),
             }
 
             KeyCodes.MODE_SYMBOLS -> {
-                keyboardView.isAlphaMode = false
-                keyboardView.shiftState  = MGCKeyboardView.ShiftState.NONE
+                keyboardView.mode = MGCKeyboardView.KeyboardMode.SYMBOLS
+                keyboardView.shiftState = MGCKeyboardView.ShiftState.NONE
             }
 
             KeyCodes.MODE_ALPHABET -> {
-                keyboardView.isAlphaMode = true
+                keyboardView.mode = MGCKeyboardView.KeyboardMode.ALPHA
+            }
+
+            KeyCodes.MODE_CLIPBOARD -> {
+                keyboardView.mode = MGCKeyboardView.KeyboardMode.CLIPBOARD
             }
 
             KeyCodes.EMOJI -> {
-                // TODO: emoji panel — no-op for now
+                keyboardView.mode = MGCKeyboardView.KeyboardMode.EMOJI
             }
+
+            KeyCodes.COPY       -> ic.performContextMenuAction(android.R.id.copy)
+            KeyCodes.PASTE      -> ic.performContextMenuAction(android.R.id.paste)
+            KeyCodes.CUT        -> ic.performContextMenuAction(android.R.id.cut)
+            KeyCodes.SELECT_ALL -> ic.performContextMenuAction(android.R.id.selectAll)
 
             else -> {
                 if (primaryCode > 0) {
-                    var ch = primaryCode.toChar()
-                    if (ch.isLetter() && keyboardView.shiftState != MGCKeyboardView.ShiftState.NONE) {
-                        ch = ch.uppercaseChar()
+                    // Codepoints above the BMP (most emoji) don't fit in a single Char —
+                    // Character.toChars() gives the correct one-or-two-char UTF-16 sequence.
+                    var text = String(Character.toChars(primaryCode))
+                    val isLetter = text.length == 1 && text[0].isLetter()
+                    if (isLetter && keyboardView.shiftState != MGCKeyboardView.ShiftState.NONE) {
+                        text = text.uppercase()
                     }
-                    ic.commitText(ch.toString(), 1)
-                    wordBuffer.append(ch)
+                    ic.commitText(text, 1)
+                    wordBuffer.append(text)
 
                     // One-shot shift: reset after single letter is committed
-                    if (keyboardView.shiftState == MGCKeyboardView.ShiftState.SHIFTED) {
+                    if (isLetter && keyboardView.shiftState == MGCKeyboardView.ShiftState.SHIFTED) {
                         keyboardView.shiftState = MGCKeyboardView.ShiftState.NONE
                     }
                 }

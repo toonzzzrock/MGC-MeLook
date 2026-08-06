@@ -13,12 +13,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mgc_keyboard.dashboard.MelookColors
+import com.example.mgc_keyboard.dashboard.bridge.ClinicalBridgeState
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-/** US7-1: transparent data-sharing screen. Mode B (clinician sharing) isn't part of this
- * build, so the honest answer is that nothing leaves the device — this screen states that
- * plainly rather than describing a sharing flow that doesn't exist yet. */
+/** US7-1: transparent data-sharing screen. Reflects the real Clinical Bridge toggle
+ * (Settings) instead of a fixed claim — the app does declare INTERNET and does make network
+ * calls when a clinician connection is enabled, so the copy here must track [bridgeState]. */
 @Composable
-fun DataSharingScreen(onBack: () -> Unit) {
+fun DataSharingScreen(bridgeState: ClinicalBridgeState = ClinicalBridgeState(), onBack: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -34,26 +38,67 @@ fun DataSharingScreen(onBack: () -> Unit) {
         }
         Spacer(Modifier.height(16.dp))
 
-        Surface(shape = RoundedCornerShape(16.dp), color = MelookColors.AccentSoft, modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
-                Text("🔒  Nothing is being shared", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MelookColors.TextDark)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "This app has no clinician or clinic connection enabled, and it never requests internet access. All behavioral data is generated, scored, and stored only on this device.",
-                    fontSize = 13.sp,
-                    color = MelookColors.TextGray
-                )
+        if (!bridgeState.enabled) {
+            Surface(shape = RoundedCornerShape(16.dp), color = MelookColors.AccentSoft, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("🔒  Nothing is being shared", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MelookColors.TextDark)
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Clinical Bridge is off. All behavioral data is generated, scored, and stored only on this device, and no network call is made.",
+                        fontSize = 13.sp,
+                        color = MelookColors.TextGray
+                    )
+                }
             }
-        }
 
-        Spacer(Modifier.height(16.dp))
-        Text("If a clinician connection is ever enabled", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MelookColors.TextDark)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "You would see an explicit consent step here first, and this screen would list the exact metrics being shared — never raw text, calls, or messages.",
-            fontSize = 12.sp,
-            color = MelookColors.TextGray
-        )
+            Spacer(Modifier.height(16.dp))
+            Text("If you turn Clinical Bridge on (Settings)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MelookColors.TextDark)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "The device sends only the metrics listed below to the server you configure — never raw text, calls, or messages.",
+                fontSize = 12.sp,
+                color = MelookColors.TextGray
+            )
+        } else {
+            Surface(shape = RoundedCornerShape(16.dp), color = MelookColors.Amber.copy(alpha = 0.15f), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("🌐  Clinical Bridge is on", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MelookColors.TextDark)
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "This device sends the metrics below to ${bridgeState.serverUrl.ifBlank { "the configured server" }} on each sync.",
+                        fontSize = 13.sp,
+                        color = MelookColors.TextGray
+                    )
+                    bridgeState.lastSyncAtMillis?.let { lastSync ->
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Last sync: ${SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()).format(Date(lastSync))}",
+                            fontSize = 11.sp,
+                            color = MelookColors.TextGray
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Text("Exactly what is sent", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MelookColors.TextDark)
+            Spacer(Modifier.height(8.dp))
+            listOf(
+                "Backspace rate (share of key presses that were backspace)",
+                "On-device sentiment score of what you type",
+                "Screen-on minutes",
+                "Number of distinct apps used",
+                "Total key presses and words scored"
+            ).forEach { line ->
+                Text("• $line", fontSize = 12.sp, color = MelookColors.TextGray)
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Never sent: raw keystrokes, message content, call logs, contacts, or app names.",
+                fontSize = 12.sp,
+                color = MelookColors.TextGray
+            )
+        }
         Spacer(Modifier.height(24.dp))
     }
 }

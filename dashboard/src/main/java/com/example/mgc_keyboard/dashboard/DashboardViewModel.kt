@@ -40,11 +40,37 @@ private fun hourOfDayLabel(hour: Int): String {
     }
 }
 
+/** Compares the last 7 days of the trend window against baseline sentiment, so the label on
+ * TrendsScreen describes what the plotted line actually shows instead of a fixed string. */
+private fun trendDirectionLabel(byDay: Map<Long, List<HourlyStat>>, baseline: BehavioralBaseline?): String {
+    if (baseline == null || byDay.size < 14) return ""
+    val recentSentiment = byDay.entries.sortedByDescending { it.key }.take(7)
+        .flatMap { it.value }.mapNotNull { it.averageSentiment() }.average()
+        .let { if (it.isNaN()) return "" else it }
+    val delta = recentSentiment - baseline.avgSentiment
+    return when {
+        delta > 0.05 -> "more positive than usual →"
+        delta < -0.05 -> "less positive than usual →"
+        else -> "about the same as usual →"
+    }
+}
+
 data class CollectedToday(
     val typingSessions: Int,
     val screenTimeLabel: String,
     val appsUsed: Int,
     val quietStretches: Int
+)
+
+/** The current (still-filling) hour bucket, straight from the same Room Flow every other
+ * chart reads — so this ticks up live as you type, letting you verify a keystroke actually
+ * got recorded instead of just trusting the app. */
+data class CurrentHourSnapshot(
+    val keyPresses: Int = 0,
+    val backspaces: Int = 0,
+    val wordsScored: Int = 0,
+    val appSwitches: Int = 0,
+    val asOfMillis: Long = 0L
 )
 
 data class DashboardUiState(
@@ -58,6 +84,7 @@ data class DashboardUiState(
     val showSuggestion: Boolean = false,
     val hasEnoughWeeksForTrend: Boolean = false,
     val trendPoints: List<ChartPoint> = emptyList(),
+    val trendDirectionLabel: String = "",
     val quietStretchHours: Float = 0f,
     val quietStretchIncreased: Boolean = false,
     // All-stats screen: every collected signal, independent of the 14-day trend gate above.
@@ -72,7 +99,8 @@ data class DashboardUiState(
     val totalKeyPressesToday: Int = 0,
     val totalBackspacesToday: Int = 0,
     val totalWordsScoredToday: Int = 0,
-    val heatmapDays: List<HeatmapDay> = emptyList()
+    val heatmapDays: List<HeatmapDay> = emptyList(),
+    val currentHour: CurrentHourSnapshot = CurrentHourSnapshot()
 )
 
 /** US3-1/2/5: reads StatsRepository + BehavioralBaseline and derives the numbers each screen
@@ -115,6 +143,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         var weekBars = listOf<Bar>()
         var lateNightChangePercent = 0
         var showSuggestion = false
+        var appVarietyLower = false
 
         if (baseline != null) {
             val recentBackspace = recentHours.filter { it.totalKeyPresses > 0 }
@@ -146,6 +175,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             } else 0
 
             showSuggestion = kotlin.math.abs(paceChangePercent) >= 15 || lateNightChangePercent >= 20
+
+            val recentDistinctAppsPerDay = lastSevenDays.map { day -> day.sumOf { it.distinctAppCount } }.average()
+                .let { if (it.isNaN()) 0.0 else it }
+            appVarietyLower = recentDistinctAppsPerDay < baseline.avgDistinctAppsPerDay
         }
 
         val longestInactiveStretchHours = recentHours.sortedBy { it.hourBucket }
@@ -235,6 +268,15 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             )
         }
 
+        val currentHourStat = today.maxByOrNull { it.hourBucket }
+        val currentHour = CurrentHourSnapshot(
+            keyPresses = currentHourStat?.totalKeyPresses ?: 0,
+            backspaces = currentHourStat?.backspacePresses ?: 0,
+            wordsScored = currentHourStat?.wordsScored ?: 0,
+            appSwitches = currentHourStat?.appSwitchCount ?: 0,
+            asOfMillis = System.currentTimeMillis()
+        )
+
         val heatmapDays = heatmapHours.groupBy { it.dayBucket() }.map { (dayEpoch, hours) ->
             HeatmapDay(dayEpoch = dayEpoch, value = hours.sumOf { it.totalKeyPresses }.toFloat())
         }
@@ -246,7 +288,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             paceChangePercent = paceChangePercent,
             weekBars = weekBars,
             lateNightChangePercent = lateNightChangePercent,
-            appVarietyLower = true,
+            appVarietyLower = appVarietyLower,
             showSuggestion = showSuggestion,
             hasEnoughWeeksForTrend = byDay.size >= 14,
             trendPoints = if (byDay.size >= 14) {
@@ -257,6 +299,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     ChartPoint(value = score, label = day.weekdayLabel())
                 }
             } else emptyList(),
+            trendDirectionLabel = trendDirectionLabel(byDay, baseline),
             quietStretchHours = longestInactiveStretchHours.toFloat(),
             quietStretchIncreased = baseline != null && longestInactiveStretchHours > baseline.avgLongestInactiveStretchHours,
             hourlyActivityPattern = hourlyActivityPattern,
@@ -268,7 +311,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             totalKeyPressesToday = today.sumOf { it.totalKeyPresses },
             totalBackspacesToday = today.sumOf { it.backspacePresses },
             totalWordsScoredToday = today.sumOf { it.wordsScored },
-            heatmapDays = heatmapDays
+            heatmapDays = heatmapDays,
+            currentHour = currentHour
         )
     }
 }

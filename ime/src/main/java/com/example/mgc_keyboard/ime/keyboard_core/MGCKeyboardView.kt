@@ -74,9 +74,10 @@ class MGCKeyboardView @JvmOverloads constructor(
             invalidate()
         }
 
-    // Whether we're currently showing QWERTY (true) or Symbols (false).
-    // The IME service sets this; changing it triggers a layout rebuild.
-    var isAlphaMode: Boolean = true
+    /** Which key layer is showing. The IME service sets this; changing it rebuilds the layout. */
+    enum class KeyboardMode { ALPHA, SYMBOLS, EMOJI, CLIPBOARD }
+
+    var mode: KeyboardMode = KeyboardMode.ALPHA
         set(value) {
             if (field != value) {
                 field = value
@@ -147,10 +148,11 @@ class MGCKeyboardView @JvmOverloads constructor(
     private fun rebuildKeysForCurrentSize() {
         if (width == 0 || height == 0) return
         val usableHeight = (height - bottomInsetPx).coerceAtLeast(1)
-        allKeys = if (isAlphaMode) {
-            KeyboardLayout.buildQwerty(width, usableHeight)
-        } else {
-            KeyboardLayout.buildSymbols(width, usableHeight)
+        allKeys = when (mode) {
+            KeyboardMode.ALPHA     -> KeyboardLayout.buildQwerty(width, usableHeight)
+            KeyboardMode.SYMBOLS   -> KeyboardLayout.buildSymbols(width, usableHeight)
+            KeyboardMode.EMOJI     -> KeyboardLayout.buildEmoji(width, usableHeight)
+            KeyboardMode.CLIPBOARD -> KeyboardLayout.buildClipboard(width, usableHeight)
         }
     }
 

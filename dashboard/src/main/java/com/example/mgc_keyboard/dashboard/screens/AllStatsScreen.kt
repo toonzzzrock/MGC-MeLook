@@ -19,13 +19,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mgc_keyboard.dashboard.CurrentHourSnapshot
 import com.example.mgc_keyboard.dashboard.MelookColors
 import com.example.mgc_keyboard.dashboard.charts.Bar
 import com.example.mgc_keyboard.dashboard.charts.BarChart
+import com.example.mgc_keyboard.dashboard.charts.ChartCitations
+import com.example.mgc_keyboard.dashboard.charts.ChartInfo
+import com.example.mgc_keyboard.dashboard.charts.ChartInfoButton
 import com.example.mgc_keyboard.dashboard.charts.ChartPoint
 import com.example.mgc_keyboard.dashboard.charts.GithubHeatmap
 import com.example.mgc_keyboard.dashboard.charts.HeatmapDay
 import com.example.mgc_keyboard.dashboard.charts.LineChart
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /** Everything currently collected on-device (README §4.1/§4.3), in one place — not just the
  * narrative insight cards on the summary/trends screens. All figures are local-only. */
@@ -41,6 +48,7 @@ fun AllStatsScreen(
     totalKeyPressesToday: Int,
     totalBackspacesToday: Int,
     totalWordsScoredToday: Int,
+    currentHour: CurrentHourSnapshot = CurrentHourSnapshot(),
     onBack: () -> Unit
 ) {
     Column(
@@ -68,6 +76,9 @@ fun AllStatsScreen(
             )
             Spacer(Modifier.height(20.dp))
 
+            LiveNowCard(currentHour)
+            Spacer(Modifier.height(16.dp))
+
             TodayTotalsRow(totalKeyPressesToday, totalBackspacesToday, totalWordsScoredToday)
             Spacer(Modifier.height(20.dp))
 
@@ -77,7 +88,8 @@ fun AllStatsScreen(
                 subtitle = if (phoneScheduleModeIsHourly)
                     "Average screen-on time by hour of day (last 7 days), tallest = busiest hour"
                 else
-                    "Total screen-on time per day (last month)"
+                    "Total screen-on time per day (last month)",
+                info = ChartCitations.PHONE_SCHEDULE
             ) {
                 ModeToggle(
                     leftLabel = "Hourly · 7 days",
@@ -96,7 +108,8 @@ fun AllStatsScreen(
 
             StatCard(
                 title = "Backspace rate",
-                subtitle = "Share of key presses that were backspace, per day (last 7 days)"
+                subtitle = "Share of key presses that were backspace, per day (last 7 days)",
+                info = ChartCitations.BACKSPACE_RATE
             ) {
                 BarChart(bars = backspaceRateBars.ifEmpty { List(7) { Bar(0.05f, MelookColors.Accent) } })
             }
@@ -104,15 +117,20 @@ fun AllStatsScreen(
 
             StatCard(
                 title = "Typing sentiment",
-                subtitle = "On-device sentiment score of what you type, per day (last 7 days)"
+                subtitle = "On-device sentiment score of what you type, per day (last 7 days) · 0 = negative, 1 = positive",
+                info = ChartCitations.TYPING_SENTIMENT
             ) {
-                LineChart(points = sentimentTrendRecent.ifEmpty { List(7) { ChartPoint(0.5f) } })
+                LineChart(
+                    points = sentimentTrendRecent.ifEmpty { List(7) { ChartPoint(0.5f) } },
+                    valueFormatter = { com.example.mgc_keyboard.dashboard.charts.sentimentLabel(it) }
+                )
             }
             Spacer(Modifier.height(16.dp))
 
             StatCard(
                 title = "App switching",
-                subtitle = "How often you jump between apps, per day (last 7 days)"
+                subtitle = "How often you jump between apps, per day (last 7 days)",
+                info = ChartCitations.APP_SWITCHING
             ) {
                 BarChart(bars = appSwitchBars.ifEmpty { List(7) { Bar(0.05f, MelookColors.Amber) } })
             }
@@ -120,7 +138,8 @@ fun AllStatsScreen(
 
             StatCard(
                 title = "App variety",
-                subtitle = "Number of distinct apps used, per day (last 7 days)"
+                subtitle = "Number of distinct apps used, per day (last 7 days)",
+                info = ChartCitations.APP_VARIETY
             ) {
                 BarChart(bars = appVarietyBars.ifEmpty { List(7) { Bar(0.05f, MelookColors.Green) } })
             }
@@ -128,7 +147,8 @@ fun AllStatsScreen(
 
             StatCard(
                 title = "Activity heatmap",
-                subtitle = "Key presses per day (last ~14 weeks) — darker means busier"
+                subtitle = "Key presses per day (last ~14 weeks) — darker means busier",
+                info = ChartCitations.ACTIVITY_HEATMAP
             ) {
                 GithubHeatmap(days = heatmapDays)
             }
@@ -143,6 +163,47 @@ fun AllStatsScreen(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp).clickable(enabled = false) {}
             )
         }
+    }
+}
+
+/** Live proof-of-recording: this hour's counters, straight from the same Room Flow every
+ * other chart on this screen reads. Ticks up as you type elsewhere, so you can confirm a
+ * keystroke actually landed instead of trusting the app on faith. Only ticks on real writes,
+ * not a wall clock — a stale timestamp here is itself a useful "nothing was recorded" signal. */
+@Composable
+private fun LiveNowCard(currentHour: CurrentHourSnapshot) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MelookColors.AccentSoft,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MelookColors.Green, modifier = Modifier.size(8.dp)) {}
+                Spacer(Modifier.width(6.dp))
+                Text("RECORDING THIS HOUR", color = MelookColors.TextDark, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.weight(1f))
+                val asOf = if (currentHour.asOfMillis > 0)
+                    SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(currentHour.asOfMillis))
+                else "—"
+                Text("as of $asOf", color = MelookColors.TextGray, fontSize = 10.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                LiveStat("Key presses", currentHour.keyPresses)
+                LiveStat("Backspaces", currentHour.backspaces)
+                LiveStat("Words scored", currentHour.wordsScored)
+                LiveStat("App switches", currentHour.appSwitches)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiveStat(label: String, value: Int) {
+    Column {
+        Text(value.toString(), color = MelookColors.TextDark, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = MelookColors.TextGray, fontSize = 9.sp)
     }
 }
 
@@ -204,7 +265,7 @@ private fun ModeToggleChip(label: String, selected: Boolean, onClick: () -> Unit
 }
 
 @Composable
-private fun StatCard(title: String, subtitle: String, content: @Composable () -> Unit) {
+private fun StatCard(title: String, subtitle: String, info: ChartInfo? = null, content: @Composable () -> Unit) {
     Surface(
         shape = RoundedCornerShape(18.dp),
         color = MelookColors.BackgroundLight,
@@ -212,7 +273,13 @@ private fun StatCard(title: String, subtitle: String, content: @Composable () ->
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(Modifier.padding(16.dp)) {
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MelookColors.TextDark)
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MelookColors.TextDark)
+                if (info != null) {
+                    Spacer(Modifier.weight(1f))
+                    ChartInfoButton(info)
+                }
+            }
             Text(subtitle, color = MelookColors.TextGray, fontSize = 11.sp)
             Spacer(Modifier.height(10.dp))
             content()

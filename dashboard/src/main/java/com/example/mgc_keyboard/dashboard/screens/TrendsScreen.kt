@@ -17,8 +17,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mgc_keyboard.dashboard.MelookColors
+import com.example.mgc_keyboard.dashboard.charts.ChartCitations
+import com.example.mgc_keyboard.dashboard.charts.ChartInfoButton
 import com.example.mgc_keyboard.dashboard.charts.ChartPoint
 import com.example.mgc_keyboard.dashboard.charts.LineChart
+import com.example.mgc_keyboard.dashboard.charts.sentimentLabel
 
 private val DEFAULT_TREND_POINTS = listOf(0.85f, 0.80f, 0.78f, 0.72f, 0.65f, 0.55f, 0.45f, 0.35f).map { ChartPoint(it) }
 
@@ -26,7 +29,7 @@ private val DEFAULT_TREND_POINTS = listOf(0.85f, 0.80f, 0.78f, 0.72f, 0.65f, 0.5
 fun TrendsScreen(
     hasEnoughWeeksForTrend: Boolean = true,
     trendPoints: List<ChartPoint> = DEFAULT_TREND_POINTS,
-    trendDirectionLabel: String = "less active than usual →",
+    trendDirectionLabel: String = "about the same as usual →",
     quietStretchHours: Float = 3.1f,
     quietStretchIncreased: Boolean = true,
     daysOfDataCollected: Int = 14,
@@ -102,7 +105,12 @@ fun TrendsScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(Modifier.padding(16.dp)) {
-                LineChart(points = trendPoints)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Typing sentiment (0 = negative, 1 = positive)", color = MelookColors.TextGray, fontSize = 10.sp)
+                    Spacer(Modifier.weight(1f))
+                    ChartInfoButton(ChartCitations.TRENDS_SENTIMENT)
+                }
+                LineChart(points = trendPoints, valueFormatter = { sentimentLabel(it) })
                 Text(trendDirectionLabel, color = MelookColors.Amber, fontSize = 11.sp)
             }
         }
