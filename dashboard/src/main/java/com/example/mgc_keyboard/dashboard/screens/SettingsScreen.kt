@@ -42,7 +42,8 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenPrivacy: () -> Unit,
     onOpenDataSharing: () -> Unit,
-    onOpenAllStats: () -> Unit
+    onOpenAllStats: () -> Unit,
+    onOpenCustomize: () -> Unit
 ) {
     val context = LocalContext.current
     val thresholdsStore = remember { AlertThresholdsStore(context) }
@@ -166,6 +167,8 @@ fun SettingsScreen(
         }
 
         Spacer(Modifier.height(16.dp))
+        SettingsLinkRow(title = "Customize (theme)", onClick = onOpenCustomize)
+        Spacer(Modifier.height(8.dp))
         SettingsLinkRow(title = "Everything we track", onClick = onOpenAllStats)
         Spacer(Modifier.height(8.dp))
         SettingsLinkRow(title = "Privacy & on-device processing", onClick = onOpenPrivacy)

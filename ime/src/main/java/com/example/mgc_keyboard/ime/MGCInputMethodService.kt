@@ -30,6 +30,7 @@
 package com.example.mgc_keyboard.ime
 
 import android.inputmethodservice.InputMethodService
+import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import androidx.core.view.ViewCompat
@@ -173,7 +174,14 @@ class MGCInputMethodService : InputMethodService(),
             KeyCodes.SHIFT -> cycleShift()
 
             KeyCodes.ENTER -> {
-                ic.commitText("\n", 1)
+                // An editor that declares an action (Send / Search / Go / Done / Next) expects
+                // Enter to fire it, not to insert a newline — committing "\n" unconditionally was
+                // why "return" did nothing useful in chat and search fields. sendDefaultEditorAction
+                // honours IME_FLAG_NO_ENTER_ACTION, so genuinely multi-line fields return false and
+                // fall through to a real Enter key event (works in WebViews too, unlike commitText).
+                if (!sendDefaultEditorAction(true)) {
+                    sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+                }
                 commitAndClearBuffer()
             }
 

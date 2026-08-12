@@ -14,7 +14,8 @@ private val Context.appPrefsDataStore by preferencesDataStore(name = "app_prefs"
 data class AppPrefsState(
     val onboardingComplete: Boolean = false,
     val pinHash: String? = null,
-    val displayName: String? = null
+    val displayName: String? = null,
+    val darkTheme: Boolean = false
 )
 
 /** US1-1 returning-user skip + US1-4..7 local-PIN stand-in (no backend account exists offline). */
@@ -24,7 +25,8 @@ class AppPreferencesStore(private val context: Context) {
         AppPrefsState(
             onboardingComplete = prefs[ONBOARDING_COMPLETE] ?: false,
             pinHash = prefs[PIN_HASH],
-            displayName = prefs[DISPLAY_NAME]
+            displayName = prefs[DISPLAY_NAME],
+            darkTheme = prefs[DARK_THEME] ?: false
         )
     }
 
@@ -40,12 +42,17 @@ class AppPreferencesStore(private val context: Context) {
         context.appPrefsDataStore.edit { it[DISPLAY_NAME] = name }
     }
 
+    suspend fun setDarkTheme(value: Boolean) {
+        context.appPrefsDataStore.edit { it[DARK_THEME] = value }
+    }
+
     suspend fun verifyPin(pin: String, expectedHash: String): Boolean = hashPin(pin) == expectedHash
 
     private companion object {
         val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
         val PIN_HASH = stringPreferencesKey("pin_hash")
         val DISPLAY_NAME = stringPreferencesKey("display_name")
+        val DARK_THEME = booleanPreferencesKey("dark_theme")
     }
 }
 

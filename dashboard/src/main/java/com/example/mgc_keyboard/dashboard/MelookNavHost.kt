@@ -11,10 +11,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -34,6 +38,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.mgc_keyboard.dashboard.screens.AllStatsScreen
 import com.example.mgc_keyboard.dashboard.screens.ChatDemoScreen
+import com.example.mgc_keyboard.dashboard.screens.CustomizeScreen
 import com.example.mgc_keyboard.dashboard.screens.DataSharingScreen
 import com.example.mgc_keyboard.dashboard.screens.LockScreenNotificationScreen
 import com.example.mgc_keyboard.dashboard.screens.OnboardingBaselineScreen
@@ -66,6 +71,7 @@ object MelookRoutes {
     const val SETTINGS = "settings"
     const val DATA_SHARING = "data_sharing"
     const val ALL_STATS = "all_stats"
+    const val CUSTOMIZE = "customize"
 }
 
 /**
@@ -81,6 +87,21 @@ fun MelookNavHost(navController: NavHostController = rememberNavController()) {
     val scope = rememberCoroutineScope()
     val dashboardViewModel: DashboardViewModel = viewModel()
 
+    // Theme choice lands before any screen composes, so a returning dark-theme user never sees a
+    // white flash. MelookColors.dark drives our own palette; the MaterialTheme wrap below drives
+    // the M3 components (Switch, Slider, OutlinedTextField, AlertDialog, Snackbar).
+    val themePrefs by prefsStore.state.collectAsState(initial = null)
+    LaunchedEffect(themePrefs?.darkTheme) {
+        MelookColors.dark = themePrefs?.darkTheme ?: false
+    }
+
+    MaterialTheme(
+        colorScheme = if (MelookColors.dark) {
+            darkColorScheme(primary = MelookColors.Accent)
+        } else {
+            lightColorScheme(primary = MelookColors.Accent)
+        }
+    ) {
     NavHost(navController = navController, startDestination = MelookRoutes.SPLASH) {
         composable(MelookRoutes.SPLASH) {
             val prefs by prefsStore.state.collectAsState(initial = null)
@@ -206,6 +227,9 @@ fun MelookNavHost(navController: NavHostController = rememberNavController()) {
                     IconButton(onClick = { navController.navigate(MelookRoutes.ALL_STATS) }) {
                         Icon(Icons.Default.Insights, contentDescription = "Everything we track")
                     }
+                    IconButton(onClick = { navController.navigate(MelookRoutes.CUSTOMIZE) }) {
+                        Icon(Icons.Default.Palette, contentDescription = "Customize")
+                    }
                     IconButton(onClick = { navController.navigate(MelookRoutes.SETTINGS) }) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
@@ -241,7 +265,8 @@ fun MelookNavHost(navController: NavHostController = rememberNavController()) {
                 onBack = { navController.popBackStack() },
                 onOpenPrivacy = { navController.navigate(MelookRoutes.PRIVACY_INFO) },
                 onOpenDataSharing = { navController.navigate(MelookRoutes.DATA_SHARING) },
-                onOpenAllStats = { navController.navigate(MelookRoutes.ALL_STATS) }
+                onOpenAllStats = { navController.navigate(MelookRoutes.ALL_STATS) },
+                onOpenCustomize = { navController.navigate(MelookRoutes.CUSTOMIZE) }
             )
         }
         composable(MelookRoutes.DATA_SHARING) {
@@ -266,5 +291,14 @@ fun MelookNavHost(navController: NavHostController = rememberNavController()) {
                 onBack = { navController.popBackStack() }
             )
         }
+        composable(MelookRoutes.CUSTOMIZE) {
+            val prefs by prefsStore.state.collectAsState(initial = null)
+            CustomizeScreen(
+                darkTheme = prefs?.darkTheme ?: false,
+                onDarkThemeChange = { enabled -> scope.launch { prefsStore.setDarkTheme(enabled) } },
+                onBack = { navController.popBackStack() }
+            )
+        }
+    }
     }
 }
