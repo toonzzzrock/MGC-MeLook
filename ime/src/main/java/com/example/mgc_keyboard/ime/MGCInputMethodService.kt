@@ -20,11 +20,10 @@
  *   Tap Shift again    → CAPS_LOCK → NONE
  *   Any letter key     → if SHIFTED, auto-resets to NONE after commit
  *
- * Layer switching (KeyboardMode: ALPHA / SYMBOLS / EMOJI / CLIPBOARD):
- *   123 key   → SYMBOLS   (has digits + a 📋 key back to CLIPBOARD)
+ * Layer switching (KeyboardMode: ALPHA / SYMBOLS / EMOJI):
+ *   123 key   → SYMBOLS
  *   ABC key   → ALPHA
  *   😊 key    → EMOJI
- *   📋 key    → CLIPBOARD (Copy / Paste / Cut / Select all)
  *   Numeric/phone/datetime input fields open directly in SYMBOLS.
  */
 package com.example.mgc_keyboard.ime
@@ -202,18 +201,9 @@ class MGCInputMethodService : InputMethodService(),
                 keyboardView.mode = MGCKeyboardView.KeyboardMode.ALPHA
             }
 
-            KeyCodes.MODE_CLIPBOARD -> {
-                keyboardView.mode = MGCKeyboardView.KeyboardMode.CLIPBOARD
-            }
-
             KeyCodes.EMOJI -> {
                 keyboardView.mode = MGCKeyboardView.KeyboardMode.EMOJI
             }
-
-            KeyCodes.COPY       -> ic.performContextMenuAction(android.R.id.copy)
-            KeyCodes.PASTE      -> ic.performContextMenuAction(android.R.id.paste)
-            KeyCodes.CUT        -> ic.performContextMenuAction(android.R.id.cut)
-            KeyCodes.SELECT_ALL -> ic.performContextMenuAction(android.R.id.selectAll)
 
             else -> {
                 if (primaryCode > 0) {

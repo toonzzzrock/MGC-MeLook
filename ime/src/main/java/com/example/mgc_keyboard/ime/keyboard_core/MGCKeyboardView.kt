@@ -75,7 +75,7 @@ class MGCKeyboardView @JvmOverloads constructor(
         }
 
     /** Which key layer is showing. The IME service sets this; changing it rebuilds the layout. */
-    enum class KeyboardMode { ALPHA, SYMBOLS, EMOJI, CLIPBOARD }
+    enum class KeyboardMode { ALPHA, SYMBOLS, EMOJI }
 
     var mode: KeyboardMode = KeyboardMode.ALPHA
         set(value) {
@@ -149,10 +149,9 @@ class MGCKeyboardView @JvmOverloads constructor(
         if (width == 0 || height == 0) return
         val usableHeight = (height - bottomInsetPx).coerceAtLeast(1)
         allKeys = when (mode) {
-            KeyboardMode.ALPHA     -> KeyboardLayout.buildQwerty(width, usableHeight)
-            KeyboardMode.SYMBOLS   -> KeyboardLayout.buildSymbols(width, usableHeight)
-            KeyboardMode.EMOJI     -> KeyboardLayout.buildEmoji(width, usableHeight)
-            KeyboardMode.CLIPBOARD -> KeyboardLayout.buildClipboard(width, usableHeight)
+            KeyboardMode.ALPHA   -> KeyboardLayout.buildQwerty(width, usableHeight)
+            KeyboardMode.SYMBOLS -> KeyboardLayout.buildSymbols(width, usableHeight)
+            KeyboardMode.EMOJI   -> KeyboardLayout.buildEmoji(width, usableHeight)
         }
     }
 

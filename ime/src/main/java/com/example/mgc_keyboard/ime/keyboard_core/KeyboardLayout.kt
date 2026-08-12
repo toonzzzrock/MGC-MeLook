@@ -26,9 +26,6 @@ package com.example.mgc_keyboard.ime.keyboard_core
  *   Row 2 (⇧..⌫):  1.5-unit Shift + 7 × 1-unit letters + 1.5-unit Delete
  *   Row 3 (actions): 1.5-unit 123 + 1-unit emoji + 4.5-unit Space + 1-unit . + 2-unit Return
  *
- * Symbols row 3 additionally carries a clipboard-mode key ("📋") alongside
- * the quote keys, with the space bar narrowed to make room.
- *
  * Symbols layout reuses the same grid structure for a basic number/punctuation page.
  */
 object KeyboardLayout {
@@ -104,13 +101,12 @@ object KeyboardLayout {
             KeySpec(59,  ";",  1f),
             KeySpec(63,  "?",  1.5f, isSpecial = false)
         ),
-        // Row 3 — back to alpha + clipboard + common punctuation + enter
+        // Row 3 — back to alpha + common punctuation + enter
         listOf(
             KeySpec(KeyCodes.MODE_ALPHABET,  "ABC", 1.5f, isSpecial = true),
             KeySpec(34,  "\"", 1.0f),
             KeySpec(39,  "'",  1.0f),
-            KeySpec(KeyCodes.MODE_CLIPBOARD, "📋",  1.0f, isSpecial = true),
-            KeySpec(KeyCodes.SPACE, "space", 2.5f),
+            KeySpec(KeyCodes.SPACE, "space", 3.5f),
             KeySpec(46,  ".",  1.0f),
             KeySpec(KeyCodes.ENTER, "return", 2.0f, isSpecial = true)
         )
@@ -136,18 +132,6 @@ object KeyboardLayout {
         )
     }
 
-    // ── Clipboard row specs (copy / paste / cut / select-all) ─────────────────
-
-    private val CLIP_ROWS: List<List<KeySpec>> = listOf(
-        listOf(KeySpec(KeyCodes.COPY,  "Copy",  10f)),
-        listOf(KeySpec(KeyCodes.PASTE, "Paste", 10f)),
-        listOf(
-            KeySpec(KeyCodes.CUT,        "Cut",        5f),
-            KeySpec(KeyCodes.SELECT_ALL, "Select all", 5f)
-        ),
-        listOf(KeySpec(KeyCodes.MODE_ALPHABET, "ABC", 10f, isSpecial = true))
-    )
-
     // ── Public builder ───────────────────────────────────────────────────────
 
     /** Build the QWERTY key list for a view of the given pixel [width] and [height]. */
@@ -161,10 +145,6 @@ object KeyboardLayout {
     /** Build the emoji key list for a view of the given pixel [width] and [height]. */
     fun buildEmoji(width: Int, height: Int): List<Key> =
         buildKeys(EMOJI_ROWS, width, height)
-
-    /** Build the clipboard-actions key list for a view of the given pixel [width] and [height]. */
-    fun buildClipboard(width: Int, height: Int): List<Key> =
-        buildKeys(CLIP_ROWS, width, height)
 
     // ── Private helpers ──────────────────────────────────────────────────────
 
