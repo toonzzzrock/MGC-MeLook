@@ -46,7 +46,10 @@ private fun HiddenPinField(value: String, onValueChange: (String) -> Unit) {
     BasicTextField(
         value = value,
         onValueChange = { onValueChange(it.filter { c -> c.isDigit() }.take(PIN_LENGTH)) },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+        // Number, not NumberPassword: the password flag is what makes autofill services
+        // treat this as a credential field and offer to save the PIN. Digits are already
+        // invisible here (the field is 1dp; only the dots render).
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         singleLine = true,
         modifier = Modifier
             .size(1.dp)

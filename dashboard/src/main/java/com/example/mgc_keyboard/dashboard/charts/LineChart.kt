@@ -12,7 +12,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
@@ -32,15 +34,24 @@ fun LineChart(
     modifier: Modifier = Modifier,
     lineColor: Color = MelookColors.Accent,
     axisLabelColor: Color = MelookColors.TextGray,
-    valueFormatter: (Float) -> String = { it.formatAxisValue() }
+    valueFormatter: (Float) -> String = { it.formatAxisValue() },
+    /** Axis ticks need to be short; the tooltip can afford prose. Defaults to the same text. */
+    axisFormatter: (Float) -> String = valueFormatter
 ) {
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
 
     val density = LocalDensity.current
     val axisLabelSizePx = with(density) { 10.sp.toPx() }
     val xLabelHeightPx = with(density) { 18.dp.toPx() }
-    val yAxisWidthPx = with(density) { 30.dp.toPx() }
     val tooltipAreaPx = with(density) { 26.dp.toPx() }
+    val gutterPadPx = with(density) { 8.dp.toPx() }
+    // Line charts here are all on a 0..1 scale.
+    val ticks = remember { axisTickValues(1f) }
+    // Measured, not a 30dp guess: the hit-testing below has to use the same left margin the
+    // draw pass does, so it is computed once here rather than inside the Canvas.
+    val yAxisWidthPx = remember(axisFormatter, axisLabelSizePx) {
+        gutterWidthPx(ticks, axisFormatter, axisLabelSizePx, gutterPadPx)
+    }
 
     Canvas(
         modifier = modifier
@@ -77,6 +88,32 @@ fun LineChart(
             Offset(plotLeft + i * stepX, plotBottom - plotHeight * p.value.coerceIn(0f, 1f))
         }
 
+        drawGridAndTicks(
+            ticks = ticks,
+            formatter = axisFormatter,
+            plotLeft = plotLeft,
+            plotTop = plotTop,
+            plotBottom = plotBottom,
+            labelColor = axisLabelColor,
+            textSizePx = axisLabelSizePx,
+            padPx = gutterPadPx
+        )
+
+        val fill = Path().apply {
+            moveTo(offsets.first().x, plotBottom)
+            offsets.forEach { lineTo(it.x, it.y) }
+            lineTo(offsets.last().x, plotBottom)
+            close()
+        }
+        drawPath(
+            path = fill,
+            brush = Brush.verticalGradient(
+                colors = listOf(lineColor.copy(alpha = 0.28f), Color.Transparent),
+                startY = plotTop,
+                endY = plotBottom
+            )
+        )
+
         for (i in 0 until offsets.size - 1) {
             drawLine(
                 color = lineColor,
@@ -91,23 +128,18 @@ fun LineChart(
             drawCircle(color = lineColor, radius = if (isSelected) 9f else 6f, center = p)
         }
 
+        val labelPaint = axisTextPaint(axisLabelColor, axisLabelSizePx)
+        val widestLabel = points.maxOf { labelPaint.measureText(it.label) }
+        val visible = visibleLabelIndices(points.size, stepX, widestLabel)
         points.forEachIndexed { i, p ->
-            if (p.label.isNotEmpty()) {
+            if (p.label.isNotEmpty() && i in visible) {
                 drawContext.canvas.nativeCanvas.drawText(
                     p.label,
-                    plotLeft + i * stepX,
+                    (plotLeft + i * stepX).coerceIn(plotLeft, this.size.width - widestLabel / 2f),
                     this.size.height - 4f,
-                    axisTextPaint(axisLabelColor, axisLabelSizePx)
+                    labelPaint
                 )
             }
-        }
-
-        drawContext.canvas.nativeCanvas.apply {
-            val paint = axisTextPaint(axisLabelColor, axisLabelSizePx).apply {
-                textAlign = android.graphics.Paint.Align.LEFT
-            }
-            drawText(valueFormatter(0f), 2f, plotBottom, paint)
-            drawText(valueFormatter(1f), 2f, plotTop + axisLabelSizePx, paint)
         }
 
         selectedIndex?.let { i ->
@@ -132,6 +164,13 @@ fun sentimentLabel(value: Float): String = when {
     value < 0.4f -> "leaning negative (%.2f)".format(value)
     value > 0.6f -> "leaning positive (%.2f)".format(value)
     else -> "neutral (%.2f)".format(value)
+}
+
+/** Same scale as [sentimentLabel], but short enough to live in an axis gutter. */
+fun sentimentAxisLabel(value: Float): String = when {
+    value <= 0.05f -> "neg"
+    value >= 0.95f -> "pos"
+    else -> "%.1f".format(value)
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLineChartTooltip(

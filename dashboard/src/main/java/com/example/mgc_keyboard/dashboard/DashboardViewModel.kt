@@ -30,6 +30,14 @@ private fun List<HourlyStat>.weekdayLabel(): String =
 
 /** Blank for most hours — labelling all 24 bars crowds the axis unreadable, so only every
  * 3rd hour gets a tick, same spacing GitHub/most chart libraries use for dense category axes. */
+/** "13/8" for the day the batch falls on. The trend chart spans two weeks, so weekday names
+ * would repeat and tell the user nothing about which Tuesday they are looking at. */
+private fun List<HourlyStat>.dayMonthLabel(): String =
+    firstOrNull()?.let {
+        val date = LocalDate.ofEpochDay(it.dayBucket())
+        "${date.dayOfMonth}/${date.monthValue}"
+    } ?: ""
+
 private fun hourOfDayLabel(hour: Int): String {
     if (hour % 3 != 0) return ""
     return when (hour) {
@@ -212,14 +220,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val lastMonthDaysAsc = byDayMonth.entries.sortedByDescending { it.key }.take(30).map { it }.reversed()
         val maxDailyScreenTime = lastMonthDaysAsc.maxOfOrNull { (_, hours) -> hours.sumOf { it.screenTimeMillis } }
             ?.coerceAtLeast(1) ?: 1
-        val dailyActivityPatternMonth = lastMonthDaysAsc.mapIndexed { index, (dayEpoch, hours) ->
+        val dailyActivityPatternMonth = lastMonthDaysAsc.map { (dayEpoch, hours) ->
             val total = hours.sumOf { it.screenTimeMillis }
             val fraction = (total.toFloat() / maxDailyScreenTime).coerceIn(0.05f, 1f)
             Bar(
                 heightFraction = fraction,
                 color = MelookColors.Accent,
-                // Every 30 bars fit poorly with a label each — thin to every 5th, same reasoning as hourOfDayLabel.
-                label = if (index % 5 == 0) LocalDate.ofEpochDay(dayEpoch).dayOfMonth.toString() else "",
+                label = LocalDate.ofEpochDay(dayEpoch).dayOfMonth.toString(),
                 value = (total / 60_000.0).toFloat() // minutes of screen time
             )
         }
@@ -296,7 +303,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val score = day.mapNotNull { it.averageSentiment() }.average()
                         .let { if (it.isNaN()) 0.5f else it.toFloat() }
                         .coerceIn(0f, 1f)
-                    ChartPoint(value = score, label = day.weekdayLabel())
+                    ChartPoint(value = score, label = day.dayMonthLabel())
                 }
             } else emptyList(),
             trendDirectionLabel = trendDirectionLabel(byDay, baseline),

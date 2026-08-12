@@ -21,6 +21,7 @@ import com.example.mgc_keyboard.dashboard.charts.ChartCitations
 import com.example.mgc_keyboard.dashboard.charts.ChartInfoButton
 import com.example.mgc_keyboard.dashboard.charts.ChartPoint
 import com.example.mgc_keyboard.dashboard.charts.LineChart
+import com.example.mgc_keyboard.dashboard.charts.sentimentAxisLabel
 import com.example.mgc_keyboard.dashboard.charts.sentimentLabel
 
 private val DEFAULT_TREND_POINTS = listOf(0.85f, 0.80f, 0.78f, 0.72f, 0.65f, 0.55f, 0.45f, 0.35f).map { ChartPoint(it) }
@@ -110,7 +111,11 @@ fun TrendsScreen(
                     Spacer(Modifier.weight(1f))
                     ChartInfoButton(ChartCitations.TRENDS_SENTIMENT)
                 }
-                LineChart(points = trendPoints, valueFormatter = { sentimentLabel(it) })
+                LineChart(
+                    points = trendPoints,
+                    valueFormatter = { sentimentLabel(it) },
+                    axisFormatter = { sentimentAxisLabel(it) }
+                )
                 Text(trendDirectionLabel, color = MelookColors.Amber, fontSize = 11.sp)
             }
         }

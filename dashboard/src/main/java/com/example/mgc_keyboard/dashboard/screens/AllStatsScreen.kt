@@ -29,6 +29,7 @@ import com.example.mgc_keyboard.dashboard.charts.ChartInfoButton
 import com.example.mgc_keyboard.dashboard.charts.ChartPoint
 import com.example.mgc_keyboard.dashboard.charts.GithubHeatmap
 import com.example.mgc_keyboard.dashboard.charts.HeatmapDay
+import com.example.mgc_keyboard.dashboard.charts.heatmapWeekSpan
 import com.example.mgc_keyboard.dashboard.charts.LineChart
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -122,7 +123,8 @@ fun AllStatsScreen(
             ) {
                 LineChart(
                     points = sentimentTrendRecent.ifEmpty { List(7) { ChartPoint(0.5f) } },
-                    valueFormatter = { com.example.mgc_keyboard.dashboard.charts.sentimentLabel(it) }
+                    valueFormatter = { com.example.mgc_keyboard.dashboard.charts.sentimentLabel(it) },
+                    axisFormatter = { com.example.mgc_keyboard.dashboard.charts.sentimentAxisLabel(it) }
                 )
             }
             Spacer(Modifier.height(16.dp))
@@ -147,7 +149,9 @@ fun AllStatsScreen(
 
             StatCard(
                 title = "Activity heatmap",
-                subtitle = "Key presses per day (last ~14 weeks) — darker means busier",
+                // Span comes from the data, not the query window: collection gaps make the
+                // grid shorter than the 14 weeks asked for.
+                subtitle = "Key presses per day (last ${heatmapWeekSpan(heatmapDays)} weeks) — darker means busier",
                 info = ChartCitations.ACTIVITY_HEATMAP
             ) {
                 GithubHeatmap(days = heatmapDays)

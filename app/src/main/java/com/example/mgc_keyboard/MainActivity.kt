@@ -3,6 +3,7 @@ package com.example.mgc_keyboard
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -15,6 +16,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // The local passcode is not an account credential, so password managers must not
+        // offer to save it. Nothing in this app is worth autofilling, so opt the whole
+        // window out rather than tagging individual fields.
+        window.decorView.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
         UsageMonitorService.schedule(applicationContext)
         checkKeyboardStatus()
         setContent {

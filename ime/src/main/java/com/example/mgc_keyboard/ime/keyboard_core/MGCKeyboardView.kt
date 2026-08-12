@@ -26,7 +26,6 @@ package com.example.mgc_keyboard.ime.keyboard_core
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
@@ -112,18 +111,22 @@ class MGCKeyboardView @JvmOverloads constructor(
 
     // ── 2. Paint / drawing constants ─────────────────────────────────────────
 
-    // Light Figma-style palette: white keys on a soft gray board
-    private val colorBoard      = Color.parseColor("#D1D5DB")  // keyboard surround
-    private val colorKeyFace    = Color.WHITE                  // regular letter key
-    private val colorKeySpecial = Color.parseColor("#AEB3BC")  // shift, del, 123, return
-    private val colorKeyPressed = Color.parseColor("#C2C8D0")  // any key while pressed
-    private val colorKeyShadow  = Color.parseColor("#8E96A5")  // bottom-edge shadow line
-    private val colorText       = Color.parseColor("#1A1A1A")  // label text
-    private val colorTextShift  = Color.parseColor("#2563EB")  // shift-active label tint
+    /**
+     * Keyboard theme, independent of the app theme. The IME service sets it from
+     * [com.example.mgc_keyboard.statscore.KeyboardThemePrefs] on every onStartInputView.
+     */
+    var dark: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidate()
+            }
+        }
+
+    private val palette get() = if (dark) KeyboardPalette.DARK else KeyboardPalette.LIGHT
 
     private val paintFill   = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val paintText   = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color     = colorText
         typeface  = Typeface.DEFAULT
         textAlign = Paint.Align.CENTER
     }
@@ -158,7 +161,8 @@ class MGCKeyboardView @JvmOverloads constructor(
     // ── 4. Drawing ───────────────────────────────────────────────────────────
 
     override fun onDraw(canvas: Canvas) {
-        canvas.drawColor(colorBoard)
+        val theme = palette
+        canvas.drawColor(theme.board)
 
         val density   = resources.displayMetrics.density
         val metrics   = resources.displayMetrics
@@ -173,15 +177,15 @@ class MGCKeyboardView @JvmOverloads constructor(
             val bottom = (key.y + key.height).toFloat() - margin
 
             // Shadow stripe at the bottom of every key
-            paintFill.color = colorKeyShadow
+            paintFill.color = theme.keyShadow
             tmpRect.set(left, bottom - shadowH, right, bottom)
             canvas.drawRoundRect(tmpRect, cornerR, cornerR, paintFill)
 
             // Key face (slightly higher than shadow, giving a raised-key illusion)
             paintFill.color = when {
-                key === pressedKey -> colorKeyPressed
-                key.isSpecial      -> colorKeySpecial
-                else               -> colorKeyFace
+                key === pressedKey -> theme.keyPressed
+                key.isSpecial      -> theme.keySpecial
+                else               -> theme.keyFace
             }
             tmpRect.set(left, top, right, bottom - shadowH)
             canvas.drawRoundRect(tmpRect, cornerR, cornerR, paintFill)
@@ -198,8 +202,8 @@ class MGCKeyboardView @JvmOverloads constructor(
             val textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, spValue, metrics)
             paintText.textSize = textSize
             paintText.color = when {
-                key.code == KeyCodes.SHIFT && shiftState != ShiftState.NONE -> colorTextShift
-                else -> colorText
+                key.code == KeyCodes.SHIFT && shiftState != ShiftState.NONE -> theme.textShift
+                else -> theme.text
             }
 
             val cy = top + (bottom - shadowH - top) / 2f -

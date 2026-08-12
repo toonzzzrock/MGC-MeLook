@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Insights
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -224,15 +223,15 @@ fun MelookNavHost(navController: NavHostController = rememberNavController()) {
                     displayName = prefs?.displayName ?: "there",
                     onNext = { navController.navigate(MelookRoutes.TRENDS) }
                 )
+                // Theme lives in Settings > Customize only; no shortcut here.
+                // These icons sit in a bare Box, so LocalContentColor would default to
+                // black and vanish against the dark-theme surface — tint explicitly.
                 Row(modifier = Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 8.dp)) {
                     IconButton(onClick = { navController.navigate(MelookRoutes.ALL_STATS) }) {
-                        Icon(Icons.Default.Insights, contentDescription = "Everything we track")
-                    }
-                    IconButton(onClick = { navController.navigate(MelookRoutes.CUSTOMIZE) }) {
-                        Icon(Icons.Default.Palette, contentDescription = "Customize")
+                        Icon(Icons.Default.Insights, contentDescription = "Everything we track", tint = MelookColors.TextDark)
                     }
                     IconButton(onClick = { navController.navigate(MelookRoutes.SETTINGS) }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MelookColors.TextDark)
                     }
                 }
             }
@@ -257,7 +256,7 @@ fun MelookNavHost(navController: NavHostController = rememberNavController()) {
                     onClick = { navController.navigate(MelookRoutes.SETTINGS) },
                     modifier = Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 8.dp)
                 ) {
-                    Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MelookColors.TextDark)
                 }
             }
         }

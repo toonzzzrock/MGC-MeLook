@@ -34,14 +34,21 @@ fun BarChart(
     bars: List<Bar>,
     modifier: Modifier = Modifier,
     axisLabelColor: Color = MelookColors.TextGray,
-    valueFormatter: (Float) -> String = { it.formatAxisValue() }
+    valueFormatter: (Float) -> String = { it.formatAxisValue() },
+    /** Axis ticks need to be short; the tooltip can afford prose. Defaults to the same text. */
+    axisFormatter: (Float) -> String = valueFormatter
 ) {
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
 
-    val axisLabelSizePx = with(androidx.compose.ui.platform.LocalDensity.current) { 10.sp.toPx() }
-    val xLabelHeightPx = with(androidx.compose.ui.platform.LocalDensity.current) { 18.dp.toPx() }
-    val yAxisWidthPx = with(androidx.compose.ui.platform.LocalDensity.current) { 30.dp.toPx() }
-    val tooltipAreaPx = with(androidx.compose.ui.platform.LocalDensity.current) { 26.dp.toPx() }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val axisLabelSizePx = with(density) { 10.sp.toPx() }
+    val xLabelHeightPx = with(density) { 18.dp.toPx() }
+    val tooltipAreaPx = with(density) { 26.dp.toPx() }
+    val gutterPadPx = with(density) { 8.dp.toPx() }
+    val maxValue = bars.maxOfOrNull { it.value }.let { if (it == null || it <= 0f) 1f else it }
+    val ticks = axisTickValues(maxValue)
+    // Measured so the widest tick label fits; hit-testing below shares this left margin.
+    val yAxisWidthPx = gutterWidthPx(ticks, axisFormatter, axisLabelSizePx, gutterPadPx)
 
     Canvas(
         modifier = modifier
@@ -77,7 +84,20 @@ fun BarChart(
         val gap = plotWidth * 0.03f
         val barWidth = (plotWidth - gap * (barCount - 1)) / barCount
 
-        val maxValue = bars.maxOf { it.value }.let { if (it <= 0f) 1f else it }
+        drawGridAndTicks(
+            ticks = ticks,
+            formatter = axisFormatter,
+            plotLeft = plotLeft,
+            plotTop = plotTop,
+            plotBottom = plotBottom,
+            labelColor = axisLabelColor,
+            textSizePx = axisLabelSizePx,
+            padPx = gutterPadPx
+        )
+
+        val labelPaint = axisTextPaint(axisLabelColor, axisLabelSizePx)
+        val widestLabel = bars.maxOf { labelPaint.measureText(it.label) }
+        val visible = visibleLabelIndices(barCount, barWidth + gap, widestLabel)
 
         bars.forEachIndexed { i, bar ->
             val barHeight = plotHeight * bar.heightFraction
@@ -90,23 +110,14 @@ fun BarChart(
                 cornerRadius = CornerRadius(6f, 6f)
             )
 
-            if (bar.label.isNotEmpty()) {
+            if (bar.label.isNotEmpty() && i in visible) {
                 drawContext.canvas.nativeCanvas.drawText(
                     bar.label,
-                    x + barWidth / 2f,
+                    (x + barWidth / 2f).coerceAtMost(this.size.width - widestLabel / 2f),
                     this.size.height - 4f,
-                    axisTextPaint(axisLabelColor, axisLabelSizePx)
+                    labelPaint
                 )
             }
-        }
-
-        // y-axis labels: 0 at the bottom, the max value near the top of the plot area
-        drawContext.canvas.nativeCanvas.apply {
-            val paint = axisTextPaint(axisLabelColor, axisLabelSizePx).apply {
-                textAlign = android.graphics.Paint.Align.LEFT
-            }
-            drawText(valueFormatter(0f), 2f, plotBottom, paint)
-            drawText(valueFormatter(maxValue), 2f, plotTop + axisLabelSizePx, paint)
         }
 
         selectedIndex?.let { i ->

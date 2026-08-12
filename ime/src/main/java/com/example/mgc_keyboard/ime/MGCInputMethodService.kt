@@ -44,6 +44,7 @@ import com.example.mgc_keyboard.alerts.AlertNotifier
 import com.example.mgc_keyboard.alerts.AlertThresholdsStore
 import com.example.mgc_keyboard.alerts.ThresholdMonitor
 import com.example.mgc_keyboard.statscore.DiagLog
+import com.example.mgc_keyboard.statscore.KeyboardThemePrefs
 import com.example.mgc_keyboard.statscore.StatsAggregator
 import com.example.mgc_keyboard.statscore.StatsDatabase
 import com.example.mgc_keyboard.statscore.StatsRepository
@@ -125,6 +126,9 @@ class MGCInputMethodService : InputMethodService(),
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         wordBuffer.clear()
+        // Re-read here rather than in onCreateInputView: the view is created once and cached,
+        // so a theme flipped in Customize would otherwise not show until the IME restarts.
+        keyboardView.dark = KeyboardThemePrefs.isDark(this)
         // Reset shift on each new input field. Numeric/phone/datetime fields open straight
         // on the symbols layer (it already has a digit row) instead of forcing a 123 tap.
         val numberLike = info?.inputType?.let { it and android.text.InputType.TYPE_MASK_CLASS } in
