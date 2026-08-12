@@ -87,9 +87,10 @@ fun MelookNavHost(navController: NavHostController = rememberNavController()) {
     val scope = rememberCoroutineScope()
     val dashboardViewModel: DashboardViewModel = viewModel()
 
-    // Theme choice lands before any screen composes, so a returning dark-theme user never sees a
-    // white flash. MelookColors.dark drives our own palette; the MaterialTheme wrap below drives
-    // the M3 components (Switch, Slider, OutlinedTextField, AlertDialog, Snackbar).
+    // Set once here so every screen picks it up. MelookColors.dark drives our own palette; the
+    // MaterialTheme wrap below drives the M3 components (Switch, Slider, OutlinedTextField,
+    // AlertDialog, Snackbar). DataStore emits after the first frame, so a returning dark-theme
+    // user gets one light frame — hidden today because SPLASH is Navy in both themes.
     val themePrefs by prefsStore.state.collectAsState(initial = null)
     LaunchedEffect(themePrefs?.darkTheme) {
         MelookColors.dark = themePrefs?.darkTheme ?: false

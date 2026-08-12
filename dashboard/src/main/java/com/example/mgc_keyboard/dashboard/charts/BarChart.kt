@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mgc_keyboard.dashboard.MelookColors
 
 data class Bar(
     val heightFraction: Float,
@@ -32,7 +33,7 @@ data class Bar(
 fun BarChart(
     bars: List<Bar>,
     modifier: Modifier = Modifier,
-    axisLabelColor: Color = Color(0xFF8A8FA3),
+    axisLabelColor: Color = MelookColors.TextGray,
     valueFormatter: (Float) -> String = { it.formatAxisValue() }
 ) {
     var selectedIndex by remember { mutableStateOf<Int?>(null) }

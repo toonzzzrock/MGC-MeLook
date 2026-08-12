@@ -179,6 +179,9 @@ class MGCInputMethodService : InputMethodService(),
                 // why "return" did nothing useful in chat and search fields. sendDefaultEditorAction
                 // honours IME_FLAG_NO_ENTER_ACTION, so genuinely multi-line fields return false and
                 // fall through to a real Enter key event (works in WebViews too, unlike commitText).
+                // ponytail: it only bails on IME_ACTION_NONE, not IME_ACTION_UNSPECIFIED, so an
+                // editor setting neither an action nor the flag gets a no-op instead of a newline.
+                // Match on editorInfo.imeOptions directly if that ever shows up in practice.
                 if (!sendDefaultEditorAction(true)) {
                     sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
                 }

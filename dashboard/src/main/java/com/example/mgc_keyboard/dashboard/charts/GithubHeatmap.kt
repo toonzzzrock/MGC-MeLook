@@ -21,6 +21,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mgc_keyboard.dashboard.MelookColors
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
@@ -40,9 +41,9 @@ data class HeatmapDay(
 fun GithubHeatmap(
     days: List<HeatmapDay>,
     modifier: Modifier = Modifier,
-    baseColor: Color = Color(0xFF3B6FF2),
-    emptyColor: Color = Color(0xFFE4E7F0),
-    axisLabelColor: Color = Color(0xFF8A8FA3)
+    baseColor: Color = MelookColors.Accent,
+    emptyColor: Color = MelookColors.Divider,
+    axisLabelColor: Color = MelookColors.TextGray
 ) {
     var selectedEpoch by remember { mutableStateOf<Long?>(null) }
 

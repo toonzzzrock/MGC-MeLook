@@ -19,6 +19,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mgc_keyboard.dashboard.MelookColors
 
 data class ChartPoint(
     val value: Float,
@@ -29,8 +30,8 @@ data class ChartPoint(
 fun LineChart(
     points: List<ChartPoint>,
     modifier: Modifier = Modifier,
-    lineColor: Color = Color(0xFF3B6FF2),
-    axisLabelColor: Color = Color(0xFF8A8FA3),
+    lineColor: Color = MelookColors.Accent,
+    axisLabelColor: Color = MelookColors.TextGray,
     valueFormatter: (Float) -> String = { it.formatAxisValue() }
 ) {
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
