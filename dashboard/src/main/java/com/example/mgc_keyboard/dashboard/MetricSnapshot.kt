@@ -39,6 +39,9 @@ data class MetricSnapshot(
     /** Distance from the user's mean in standard deviations — what Home orders rows by. */
     val deviations: Float,
     val daysCompared: Int,
+    /** What the average column is an average *of* — spells out the same-hours window when the
+     * day is still running, so a morning figure is never labelled as a whole day. */
+    val baselineCaption: String,
     val unitCaption: String,
     val sourceLabel: String,
     val howMeasured: String,
@@ -55,6 +58,9 @@ data class MetricSnapshot(
  * the worry — would raise a risk every day before noon purely because the day is not over.
  * Ratio metrics (backspace share, mean sentiment) do not accumulate and are left alone.
  */
+/** Hours of a day that must be recorded before an accumulating total may be called unusual. */
+internal const val MIN_HOURS_TO_FLAG = 6
+
 internal fun <T> alignToPartialDay(daysAsc: List<List<T>>, hourOfDay: (T) -> Int): List<List<T>> {
     val cutoff = daysAsc.lastOrNull()?.maxOfOrNull(hourOfDay) ?: return daysAsc
     return daysAsc.map { day -> day.filter { hourOfDay(it) <= cutoff } }
@@ -76,7 +82,10 @@ internal fun metricFrom(
     sourceLabel: String,
     howMeasured: String,
     info: ChartInfo,
-    asLine: Boolean = false
+    asLine: Boolean = false,
+    /** Hours of the day behind the figures, when this is an accumulating total aligned by
+     * [alignToPartialDay]; null for ratio metrics and for a day that has run its full 24 hours. */
+    partialDayHours: Int? = null
 ): MetricSnapshot? {
     if (series.size < 4) return null
     val today = series.last().second
@@ -86,7 +95,11 @@ internal fun metricFrom(
     val delta = today - mean
     // A flat series (sd == 0) would flag any change at all as unusual, so it stays unflagged.
     val deviations = if (sd > 0f) abs(delta) / sd else 0f
-    val outside = prior.size >= 5 && sd > 0f && deviations > 1f
+    // A few hours of a running total carry almost no spread, so an ordinary first coffee can sit
+    // several deviations above a near-zero mean. Aligned totals only get to claim "unusual" once
+    // enough of the day is behind them; the number itself still shows from the first hour.
+    val enoughOfTheDay = partialDayHours == null || partialDayHours >= MIN_HOURS_TO_FLAG
+    val outside = prior.size >= 5 && sd > 0f && deviations > 1f && enoughOfTheDay
     val higher = delta >= 0f
     val concerning = outside && (higher == higherIsConcerning)
 
@@ -114,10 +127,15 @@ internal fun metricFrom(
         concerning = concerning,
         deviations = deviations,
         daysCompared = prior.size,
+        baselineCaption = if (partialDayHours == null) "${prior.size}-day average"
+        else "${prior.size}-day average, same hours",
         unitCaption = unitCaption,
         sourceLabel = sourceLabel,
         howMeasured = howMeasured,
-        plainReading = "${format(today)} today vs ${format(mean)} on your last ${prior.size} days",
+        plainReading = if (partialDayHours == null)
+            "${format(today)} today vs ${format(mean)} on your last ${prior.size} days"
+        else
+            "${format(today)} so far today vs ${format(mean)} by this time on your last ${prior.size} days",
         info = info,
         bars = bars,
         points = points

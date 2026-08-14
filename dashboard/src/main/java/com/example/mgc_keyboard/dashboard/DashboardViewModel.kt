@@ -106,6 +106,11 @@ data class DashboardUiState(
  * per metric; days with nothing recorded for that metric are dropped rather than counted as
  * zero, which would drag the average down and manufacture a deviation.
  */
+/** Shared tail for the four running totals, so the ⓘ text matches what is computed. */
+private const val ALIGNMENT_NOTE =
+    "Earlier days are cut off at the same time of day as now, so a day still in progress is not read " +
+        "as a drop, and no change is called unusual until $MIN_HOURS_TO_FLAG hours of the day are recorded."
+
 private fun buildMetrics(byDay: Map<Long, List<HourlyStat>>): List<MetricSnapshot> {
     val daysAsc = byDay.entries.sortedBy { it.key }.map { it.value }
 
@@ -115,6 +120,16 @@ private fun buildMetrics(byDay: Map<Long, List<HourlyStat>>): List<MetricSnapsho
     /** For daily totals: earlier days cut to the hour today has reached, so a part-day total is
      * not read as a drop. See [alignToPartialDay]. */
     val alignedDaysAsc = alignToPartialDay(daysAsc) { (it.hourBucket % 24).toInt() }
+
+    /** Hours of today behind the aligned totals; null once the day has run all 24, which is when
+     * the totals are whole days again and the copy can say so. */
+    val partialDayHours = alignedDaysAsc.lastOrNull()
+        ?.maxOfOrNull { (it.hourBucket % 24).toInt() + 1 }
+        ?.takeIf { it < 24 }
+
+    /** Running totals are same-hours figures until the day is out, and the captions have to say
+     * so — the bars are truncated too, so "per day" would be labelling a morning as a whole day. */
+    val perWindow = if (partialDayHours == null) "per day" else "counted to this time of day"
 
     fun runningTotal(value: (List<HourlyStat>) -> Float?): List<Pair<String, Float>> =
         alignedDaysAsc.mapNotNull { day ->
@@ -144,10 +159,11 @@ private fun buildMetrics(byDay: Map<Long, List<HourlyStat>>): List<MetricSnapsho
             format = { formatMinutes(it) },
             deltaFormat = { formatMinutes(it) },
             higherIsConcerning = true,
-            unitCaption = "Total time the screen was on, per day",
+            unitCaption = "Total time the screen was on, $perWindow",
             sourceLabel = "Place et al., 2017",
-            howMeasured = "Screen-on time is summed per hour from the system usage tracker, then totalled per calendar day. Earlier days are cut off at the same time of day as now, so a day still in progress is not read as a drop.",
-            info = ChartCitations.PHONE_SCHEDULE
+            howMeasured = "Screen-on time is summed per hour from the system usage tracker, then totalled per calendar day. $ALIGNMENT_NOTE",
+            info = ChartCitations.PHONE_SCHEDULE,
+            partialDayHours = partialDayHours
         ),
         metricFrom(
             key = MetricKeys.APP_SWITCHING,
@@ -156,10 +172,11 @@ private fun buildMetrics(byDay: Map<Long, List<HourlyStat>>): List<MetricSnapsho
             format = { "${it.toInt()}" },
             deltaFormat = { "${it.toInt()}" },
             higherIsConcerning = true,
-            unitCaption = "Times you moved between apps, per day",
+            unitCaption = "Times you moved between apps, $perWindow",
             sourceLabel = "Rozgonjuk et al., 2021",
-            howMeasured = "Each time the foreground app changes it is counted once, and the counts are totalled per day. Earlier days are cut off at the same time of day as now, so a day still in progress is not read as a drop.",
-            info = ChartCitations.APP_SWITCHING
+            howMeasured = "Each time the foreground app changes it is counted once, and the counts are totalled per day. $ALIGNMENT_NOTE",
+            info = ChartCitations.APP_SWITCHING,
+            partialDayHours = partialDayHours
         ),
         metricFrom(
             key = MetricKeys.BACKSPACE,
@@ -183,10 +200,11 @@ private fun buildMetrics(byDay: Map<Long, List<HourlyStat>>): List<MetricSnapsho
             format = { "${it.toInt()}" },
             deltaFormat = { "${it.toInt()}" },
             higherIsConcerning = false,
-            unitCaption = "Distinct apps opened, per day",
+            unitCaption = "Distinct apps opened, $perWindow",
             sourceLabel = "Saeb et al., 2015",
-            howMeasured = "Distinct apps seen in each hour, totalled per day. A narrowing set of apps is the withdrawal signal this tracks. Earlier days are cut off at the same time of day as now, so a day still in progress is not read as a drop.",
-            info = ChartCitations.APP_VARIETY
+            howMeasured = "Distinct apps seen in each hour, totalled per day. A narrowing set of apps is the withdrawal signal this tracks. $ALIGNMENT_NOTE",
+            info = ChartCitations.APP_VARIETY,
+            partialDayHours = partialDayHours
         ),
         metricFrom(
             key = MetricKeys.QUIET,
@@ -195,10 +213,11 @@ private fun buildMetrics(byDay: Map<Long, List<HourlyStat>>): List<MetricSnapsho
             format = { "${it.toInt()}h" },
             deltaFormat = { "${it.toInt()}h" },
             higherIsConcerning = true,
-            unitCaption = "Hours with no typing and no screen time",
+            unitCaption = "Hours with no typing and no screen time, $perWindow",
             sourceLabel = "Place et al., 2017",
-            howMeasured = "An hour counts as quiet when it recorded no key presses and no screen-on time. This counts those hours per day. Earlier days are cut off at the same time of day as now, so a day still in progress is not read as a drop.",
-            info = ChartCitations.PHONE_SCHEDULE
+            howMeasured = "An hour counts as quiet when it recorded no key presses and no screen-on time. This counts those hours per day. $ALIGNMENT_NOTE",
+            info = ChartCitations.PHONE_SCHEDULE,
+            partialDayHours = partialDayHours
         )
     )
     return metrics.sortedByDescending { it.deviations }

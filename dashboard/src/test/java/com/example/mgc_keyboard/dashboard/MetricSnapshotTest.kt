@@ -109,6 +109,41 @@ class MetricSnapshotTest {
     }
 
     @Test
+    fun `a thin early-hour window cannot claim a total is unusual`() {
+        // Prior mornings by 6am: mostly nothing, occasionally a couple of switches. Today's 3 is
+        // several deviations above that near-zero mean, which is the hour talking, not the user.
+        val series = listOf(0f, 0f, 1f, 0f, 0f, 2f, 3f).map { "Mon" to it }
+        fun snap(hours: Int?) = metricFrom(
+            key = "k", name = "App switching", series = series,
+            format = { "${it.toInt()}" }, deltaFormat = { "${it.toInt()}" },
+            higherIsConcerning = true, unitCaption = "", sourceLabel = "",
+            howMeasured = "", info = ChartCitations.APP_SWITCHING, partialDayHours = hours
+        )!!
+        assertTrue("without the hour guard the morning flags", snap(null).concerning)
+        assertFalse(snap(2).outsideUsualRange)
+        assertFalse(snap(2).concerning)
+        // The number itself is unaffected; only the claim about it is held back.
+        assertEquals("3", snap(2).todayLabel)
+        // Past the threshold the rule applies again.
+        assertTrue(snap(MIN_HOURS_TO_FLAG).concerning)
+    }
+
+    @Test
+    fun `a running total says which window it covers`() {
+        val series = List(7) { "Mon" to 5f }
+        fun snap(hours: Int?) = metricFrom(
+            key = "k", name = "Screen-on time", series = series,
+            format = { "${it.toInt()}m" }, deltaFormat = { "${it.toInt()}m" },
+            higherIsConcerning = true, unitCaption = "", sourceLabel = "",
+            howMeasured = "", info = ChartCitations.PHONE_SCHEDULE, partialDayHours = hours
+        )!!
+        assertEquals("6-day average", snap(null).baselineCaption)
+        assertEquals("6-day average, same hours", snap(9).baselineCaption)
+        assertTrue(snap(9).plainReading.contains("so far today"))
+        assertTrue(snap(9).plainReading.contains("by this time"))
+    }
+
+    @Test
     fun `minutes format switches to hours past sixty`() {
         assertEquals("45m", formatMinutes(45f))
         assertEquals("2h 48m", formatMinutes(168f))

@@ -149,7 +149,7 @@ fun MetricDetailScreen(
                             Text(metric.todayLabel, color = MelookColors.TextDark, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
                         }
                         Column(Modifier.weight(1f)) {
-                            Text("${metric.daysCompared}-day average", color = MelookColors.TextFaint, fontSize = 11.sp)
+                            Text(metric.baselineCaption, color = MelookColors.TextFaint, fontSize = 11.sp)
                             Text(metric.baselineLabel, color = MelookColors.TextGray, fontSize = 22.sp)
                         }
                         Column(horizontalAlignment = Alignment.End) {
