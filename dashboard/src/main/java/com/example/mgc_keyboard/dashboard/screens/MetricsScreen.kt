@@ -46,7 +46,7 @@ fun MetricsScreen(
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             ScreenHeader(
                 title = "Metrics",
-                caption = "Shaded band is your usual range · the dot is today"
+                caption = "Shaded band is your usual range · the dot is today · marked rows sat outside it, amber where the move runs the way the research warns about"
             )
             Column(Modifier.padding(horizontal = 20.dp)) {
                 if (metrics.isEmpty()) {
@@ -73,19 +73,32 @@ fun MetricsScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable { onOpenMetric(metric.key) }
-                                    // Rows outside the usual range carry a tint and a marker, so
-                                    // the ones worth reading are found without scanning numbers.
+                                    // Tint marks the rows worth reading. Padding stays the same on
+                                    // every row: inset only the tinted ones and their strips would
+                                    // be narrower than the rest, so the dots would stop lining up.
                                     .background(if (metric.concerning) MelookColors.WarnSurface else MelookColors.Surface)
-                                    .padding(vertical = 12.dp, horizontal = if (metric.concerning) 10.dp else 0.dp)
+                                    .padding(vertical = 12.dp, horizontal = 10.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (metric.concerning) {
-                                        Text("● ", color = MelookColors.SeriesFlagged, fontSize = 11.sp)
+                                    // Fixed-width slot so the marker never shifts the name.
+                                    Box(Modifier.width(12.dp)) {
+                                        if (metric.outsideUsualRange) {
+                                            Text(
+                                                "●",
+                                                color = if (metric.concerning) MelookColors.SeriesFlagged else MelookColors.TextGray,
+                                                fontSize = 9.sp
+                                            )
+                                        }
                                     }
                                     Text(metric.name, color = MelookColors.TextDark, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                                     ChartInfoDot(metric.info)
                                     Spacer(Modifier.weight(1f))
-                                    Text(metric.todayLabel, color = MelookColors.TextDark, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                                    // A figure on its own says nothing, so today never appears
+                                    // without the average it is being read against.
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(metric.todayLabel, color = MelookColors.TextDark, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                                        Text("usually ${metric.baselineLabel}", color = MelookColors.TextFaint, fontSize = 11.sp)
+                                    }
                                     Spacer(Modifier.width(6.dp))
                                     RowChevron()
                                 }

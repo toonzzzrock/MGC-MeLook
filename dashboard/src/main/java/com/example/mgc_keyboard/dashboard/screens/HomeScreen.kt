@@ -135,60 +135,27 @@ fun HomeScreen(
                     }
                     Spacer(Modifier.height(16.dp))
 
-                    // Home carries only what moved. The full list of signals is the Metrics tab's
-                    // job, and repeating it here left that tab with nothing of its own to do.
-                    val movers = metrics.filter { it.outsideUsualRange }
-                    SectionLabel(if (movers.isEmpty()) "TODAY" else "WHAT MOVED TODAY")
-                    SectionCard {
-                        if (movers.isEmpty()) {
+                    // No table of signals here. The risk card above already names anything worth
+                    // acting on, and the full list is the Metrics tab's whole job — a second copy
+                    // on Home left that tab with nothing of its own.
+                    val movers = metrics.count { it.outsideUsualRange }
+                    SectionLabel("TODAY")
+                    SectionCard(modifier = Modifier.clickable { onOpenMetrics() }) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                "All ${metrics.size} signals are within your usual range today.",
+                                if (movers == 0) "All ${metrics.size} signals are within your usual range."
+                                else "$movers of ${metrics.size} signals are outside your usual range.",
                                 color = MelookColors.TextDark,
-                                fontSize = 14.sp
+                                fontSize = 14.sp,
+                                modifier = Modifier.weight(1f)
                             )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                "Nothing sat further from your own average than an ordinary day's variation.",
-                                color = MelookColors.TextGray,
-                                fontSize = 12.sp
-                            )
-                        } else {
-                        Row(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                            Text("Signal", color = MelookColors.TextFaint, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                            Text("Today", color = MelookColors.TextFaint, fontSize = 11.sp, modifier = Modifier.width(74.dp))
-                            Text("Change", color = MelookColors.TextFaint, fontSize = 11.sp, modifier = Modifier.width(64.dp))
-                            Spacer(Modifier.width(14.dp))
+                            RowChevron()
                         }
-                        movers.forEach { metric ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onOpenMetric(metric.key) }
-                                    .padding(vertical = 9.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                                    Text(metric.name, color = MelookColors.TextDark, fontSize = 13.sp)
-                                    ChartInfoDot(metric.info)
-                                }
-                                Column(Modifier.width(74.dp)) {
-                                    Text(metric.todayLabel, color = MelookColors.TextDark, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                    Text("was ${metric.baselineLabel}", color = MelookColors.TextFaint, fontSize = 11.sp)
-                                }
-                                Column(Modifier.width(64.dp)) {
-                                    DeltaText(metric.deltaLabel, metric.concerning, metric.outsideUsualRange)
-                                }
-                                RowChevron()
-                            }
-                        }
-                        }
-                        Spacer(Modifier.height(10.dp))
+                        Spacer(Modifier.height(3.dp))
                         Text(
-                            "See all ${metrics.size} signals ›",
-                            color = MelookColors.Accent,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.clickable { onOpenMetrics() }
+                            "Open Metrics to see every signal against its band.",
+                            color = MelookColors.TextGray,
+                            fontSize = 12.sp
                         )
                     }
                     Spacer(Modifier.height(16.dp))
