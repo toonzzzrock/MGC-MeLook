@@ -2,23 +2,26 @@ package com.example.mgc_keyboard.dashboard.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mgc_keyboard.dashboard.MelookColors
+import com.example.mgc_keyboard.dashboard.MetricKeys
 import com.example.mgc_keyboard.dashboard.charts.ChartCitations
-import com.example.mgc_keyboard.dashboard.charts.ChartInfoButton
+import com.example.mgc_keyboard.dashboard.charts.ChartInfoDot
 import com.example.mgc_keyboard.dashboard.charts.ChartPoint
 import com.example.mgc_keyboard.dashboard.charts.LineChart
 import com.example.mgc_keyboard.dashboard.charts.sentimentAxisLabel
@@ -26,160 +29,87 @@ import com.example.mgc_keyboard.dashboard.charts.sentimentLabel
 
 private val DEFAULT_TREND_POINTS = listOf(0.85f, 0.80f, 0.78f, 0.72f, 0.65f, 0.55f, 0.45f, 0.35f).map { ChartPoint(it) }
 
+/**
+ * The long view: one line over every recorded day, against the direction label the ViewModel
+ * derives from the same window. Day-to-day noise is what Home is for, so nothing here is
+ * flagged as urgent — this screen exists to make a slow drift visible.
+ */
 @Composable
 fun TrendsScreen(
     hasEnoughWeeksForTrend: Boolean = true,
     trendPoints: List<ChartPoint> = DEFAULT_TREND_POINTS,
-    trendDirectionLabel: String = "about the same as usual →",
+    trendDirectionLabel: String = "about the same as usual",
     quietStretchHours: Float = 3.1f,
     quietStretchIncreased: Boolean = true,
     daysOfDataCollected: Int = 14,
-    onNext: () -> Unit
+    onOpenMetric: (String) -> Unit,
+    bottomBar: @Composable () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MelookColors.Surface)
-            .padding(horizontal = 20.dp)
-    ) {
-        Spacer(Modifier.height(24.dp))
-        Text("YOUR TRENDS · LAST 8 WEEKS", color = MelookColors.Accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(6.dp))
-        Text("How your habits have changed", color = MelookColors.TextDark, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Small changes add up too slowly to notice day by day. Here are yours at a glance.",
-            color = MelookColors.TextGray,
-            fontSize = 13.sp
-        )
-        Spacer(Modifier.height(16.dp))
-
-        if (!hasEnoughWeeksForTrend) {
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = MelookColors.BackgroundLight,
-                border = androidx.compose.foundation.BorderStroke(1.dp, MelookColors.Divider),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("Not enough data yet", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MelookColors.TextDark)
-                    Text(
-                        "Trends need at least two weeks of data to be meaningful ($daysOfDataCollected of 14 days collected so far).",
-                        color = MelookColors.TextGray,
-                        fontSize = 12.sp
-                    )
+    Column(Modifier.fillMaxSize().background(MelookColors.BackgroundLight)) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            ScreenHeader(
+                title = "Trends",
+                caption = "Typing sentiment across $daysOfDataCollected recorded days"
+            )
+            Column(Modifier.padding(horizontal = 20.dp)) {
+                if (!hasEnoughWeeksForTrend) {
+                    SectionCard {
+                        Text("Not enough data yet", color = MelookColors.TextDark, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "A trend line needs at least 14 days before it says more than noise — $daysOfDataCollected days recorded so far.",
+                            color = MelookColors.TextGray,
+                            fontSize = 13.sp
+                        )
+                    }
+                } else {
+                    SectionCard {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Typing sentiment", color = MelookColors.TextDark, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            ChartInfoDot(ChartCitations.TRENDS_SENTIMENT)
+                        }
+                        Text("0 = negative, 1 = positive · one point per day", color = MelookColors.TextGray, fontSize = 12.sp)
+                        Spacer(Modifier.height(12.dp))
+                        LineChart(
+                            points = trendPoints,
+                            lineColor = MelookColors.SeriesNeutral,
+                            valueFormatter = { sentimentLabel(it) },
+                            axisFormatter = { sentimentAxisLabel(it) }
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            "Last 7 days read $trendDirectionLabel, compared with your own earlier weeks.",
+                            color = MelookColors.TextGray,
+                            fontSize = 12.sp
+                        )
+                        Text("Source: Eichstaedt et al., 2018", color = MelookColors.TextFaint, fontSize = 11.sp)
+                    }
+                    Spacer(Modifier.height(16.dp))
                 }
-            }
-            Spacer(Modifier.height(14.dp))
-            Text("LIVE SO FAR", color = MelookColors.Accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(8.dp))
-            TrendRow(
-                title = "Longest quiet stretch",
-                detail = "$quietStretchHours hours of inactivity so far",
-                icon = Icons.Default.ArrowDownward,
-                iconTint = MelookColors.Accent
-            )
-            Spacer(Modifier.weight(1f))
-            Text(
-                "← Back to summary",
-                color = MelookColors.Accent,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).clickable { onNext() }
-            )
-            Text(
-                "🔒  All of this stays on your phone",
-                color = MelookColors.Green,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
-            )
-            return@Column
-        }
 
-        Surface(
-            shape = RoundedCornerShape(18.dp),
-            color = MelookColors.BackgroundLight,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MelookColors.Divider),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Typing sentiment (0 = negative, 1 = positive)", color = MelookColors.TextGray, fontSize = 10.sp)
-                    Spacer(Modifier.weight(1f))
-                    ChartInfoButton(ChartCitations.TRENDS_SENTIMENT)
+                SectionLabel("ALSO OVER THIS WINDOW")
+                SectionCard(modifier = Modifier.clickable { onOpenMetric(MetricKeys.QUIET) }) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Longest quiet stretch", color = MelookColors.TextDark, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                ChartInfoDot(ChartCitations.PHONE_SCHEDULE)
+                            }
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                "${quietStretchHours.toInt()} hours with no typing and no screen time — " +
+                                    if (quietStretchIncreased) "longer than your usual" else "in line with your usual",
+                                color = MelookColors.TextGray,
+                                fontSize = 12.sp
+                            )
+                        }
+                        RowChevron()
+                    }
                 }
-                LineChart(
-                    points = trendPoints,
-                    valueFormatter = { sentimentLabel(it) },
-                    axisFormatter = { sentimentAxisLabel(it) }
-                )
-                Text(trendDirectionLabel, color = MelookColors.Amber, fontSize = 11.sp)
+
+                DisclaimerLine()
             }
         }
-
-        Spacer(Modifier.height(16.dp))
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MelookColors.AccentSoft,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Text("Spotted early", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MelookColors.TextDark)
-                Text(
-                    "This change became visible weeks before you might have noticed it yourself.",
-                    color = MelookColors.TextGray,
-                    fontSize = 12.sp
-                )
-            }
-        }
-
-        Spacer(Modifier.height(14.dp))
-        TrendRow(
-            title = "Longest quiet stretch",
-            detail = "${quietStretchHours} hours of inactivity — ${if (quietStretchIncreased) "more" else "less"} than usual",
-            icon = if (quietStretchIncreased) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
-            iconTint = if (quietStretchIncreased) Color(0xFFE0733C) else MelookColors.Accent
-        )
-
-        Spacer(Modifier.weight(1f))
-        Text(
-            "← Back to summary",
-            color = MelookColors.Accent,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).clickable { onNext() }
-        )
-        Text(
-            "🔒  All of this stays on your phone",
-            color = MelookColors.Green,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
-        )
-    }
-}
-
-@Composable
-private fun TrendRow(title: String, detail: String, icon: androidx.compose.ui.graphics.vector.ImageVector, iconTint: Color) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = MelookColors.Surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MelookColors.Divider),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(Modifier.padding(14.dp)) {
-            Text(title, fontSize = 13.sp, color = MelookColors.TextDark)
-            Spacer(Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(detail, fontSize = 12.sp, color = iconTint)
-            }
-        }
+        bottomBar()
     }
 }

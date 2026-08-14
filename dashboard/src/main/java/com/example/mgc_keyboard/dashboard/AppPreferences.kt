@@ -3,6 +3,7 @@ package com.example.mgc_keyboard.dashboard
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -15,7 +16,10 @@ data class AppPrefsState(
     val onboardingComplete: Boolean = false,
     val pinHash: String? = null,
     val displayName: String? = null,
-    val darkTheme: Boolean = false
+    val darkTheme: Boolean = false,
+    /** Epoch day the Home risk dialog was last shown, so it opens once per day and not on
+     * every return to the Home tab. -1 = never shown. */
+    val riskDialogShownDay: Long = -1L
 )
 
 /** US1-1 returning-user skip + US1-4..7 local-PIN stand-in (no backend account exists offline). */
@@ -26,7 +30,8 @@ class AppPreferencesStore(private val context: Context) {
             onboardingComplete = prefs[ONBOARDING_COMPLETE] ?: false,
             pinHash = prefs[PIN_HASH],
             displayName = prefs[DISPLAY_NAME],
-            darkTheme = prefs[DARK_THEME] ?: false
+            darkTheme = prefs[DARK_THEME] ?: false,
+            riskDialogShownDay = prefs[RISK_DIALOG_SHOWN_DAY] ?: -1L
         )
     }
 
@@ -46,6 +51,10 @@ class AppPreferencesStore(private val context: Context) {
         context.appPrefsDataStore.edit { it[DARK_THEME] = value }
     }
 
+    suspend fun setRiskDialogShownDay(epochDay: Long) {
+        context.appPrefsDataStore.edit { it[RISK_DIALOG_SHOWN_DAY] = epochDay }
+    }
+
     suspend fun verifyPin(pin: String, expectedHash: String): Boolean = hashPin(pin) == expectedHash
 
     private companion object {
@@ -53,6 +62,7 @@ class AppPreferencesStore(private val context: Context) {
         val PIN_HASH = stringPreferencesKey("pin_hash")
         val DISPLAY_NAME = stringPreferencesKey("display_name")
         val DARK_THEME = booleanPreferencesKey("dark_theme")
+        val RISK_DIALOG_SHOWN_DAY = longPreferencesKey("risk_dialog_shown_day")
     }
 }
 

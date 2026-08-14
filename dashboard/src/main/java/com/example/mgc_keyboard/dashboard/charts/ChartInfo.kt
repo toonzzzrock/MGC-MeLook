@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
@@ -85,38 +86,62 @@ object ChartCitations {
 @Composable
 fun ChartInfoButton(info: ChartInfo) {
     var open by remember { mutableStateOf(false) }
-    val context = LocalContext.current
     IconButton(onClick = { open = true }) {
         Icon(Icons.Default.Info, contentDescription = "What this chart means", tint = MelookColors.TextGray)
     }
-    if (open) {
-        AlertDialog(
-            onDismissRequest = { open = false },
-            title = { Text("What this chart means") },
-            text = {
-                Column {
-                    Text(info.whatItShows, fontSize = 13.sp, color = MelookColors.TextDark, modifier = Modifier.padding(bottom = 10.dp))
-                    Text("Research reference", fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontSize = 12.sp, color = MelookColors.TextDark)
-                    Text(
-                        info.citation,
-                        fontSize = 11.sp,
-                        color = MelookColors.Accent,
-                        textDecoration = TextDecoration.Underline,
-                        modifier = Modifier
-                            .padding(top = 4.dp)
-                            .clickable {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(citationSearchUrl(info.citation))))
-                            }
-                    )
-                    Text(
-                        "This links the signal to published research — it does not mean this app diagnoses or replaces a clinician.",
-                        fontSize = 10.sp,
-                        color = MelookColors.TextGray,
-                        modifier = Modifier.padding(top = 10.dp)
-                    )
-                }
-            },
-            confirmButton = { TextButton(onClick = { open = false }) { Text("Close") } }
-        )
-    }
+    if (open) ChartInfoDialog(info) { open = false }
+}
+
+/** Same dialog, but a bare 16dp glyph instead of a 48dp [IconButton] — for list rows, where the
+ * full touch target would push the row height past what a scannable table can afford. The row
+ * itself stays tappable for its own action, so this only has to catch a deliberate tap on the
+ * glyph. */
+@Composable
+fun ChartInfoDot(info: ChartInfo, modifier: Modifier = Modifier, tint: androidx.compose.ui.graphics.Color = MelookColors.TextFaint) {
+    var open by remember { mutableStateOf(false) }
+    Icon(
+        Icons.Default.Info,
+        contentDescription = "What this measures",
+        tint = tint,
+        modifier = modifier
+            .padding(start = 6.dp)
+            .size(15.dp)
+            .clickable { open = true }
+    )
+    if (open) ChartInfoDialog(info) { open = false }
+}
+
+/** The reference pop-up itself: what the signal is, the peer-reviewed source behind tracking it,
+ * a tap-through to that source, and the reminder that an association is not a diagnosis. */
+@Composable
+fun ChartInfoDialog(info: ChartInfo, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("What this chart means") },
+        text = {
+            Column {
+                Text(info.whatItShows, fontSize = 13.sp, color = MelookColors.TextDark, modifier = Modifier.padding(bottom = 10.dp))
+                Text("Research reference", fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontSize = 12.sp, color = MelookColors.TextDark)
+                Text(
+                    info.citation,
+                    fontSize = 11.sp,
+                    color = MelookColors.Accent,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .clickable {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(citationSearchUrl(info.citation))))
+                        }
+                )
+                Text(
+                    "This links the signal to published research — it does not mean this app diagnoses or replaces a clinician.",
+                    fontSize = 10.sp,
+                    color = MelookColors.TextGray,
+                    modifier = Modifier.padding(top = 10.dp)
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+    )
 }

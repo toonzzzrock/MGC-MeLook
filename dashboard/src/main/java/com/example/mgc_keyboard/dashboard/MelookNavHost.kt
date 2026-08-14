@@ -35,11 +35,15 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.mgc_keyboard.dashboard.screens.AllStatsScreen
 import com.example.mgc_keyboard.dashboard.screens.ChatDemoScreen
 import com.example.mgc_keyboard.dashboard.screens.CustomizeScreen
 import com.example.mgc_keyboard.dashboard.screens.DataSharingScreen
+import com.example.mgc_keyboard.dashboard.screens.HomeScreen
 import com.example.mgc_keyboard.dashboard.screens.LockScreenNotificationScreen
+import com.example.mgc_keyboard.dashboard.screens.MelookBottomBar
+import com.example.mgc_keyboard.dashboard.screens.MelookTab
+import com.example.mgc_keyboard.dashboard.screens.MetricDetailScreen
+import com.example.mgc_keyboard.dashboard.screens.MetricsScreen
 import com.example.mgc_keyboard.dashboard.screens.OnboardingBaselineScreen
 import com.example.mgc_keyboard.dashboard.screens.PermissionsScreen
 import com.example.mgc_keyboard.dashboard.screens.PrivacyExplainerScreen
@@ -48,11 +52,11 @@ import com.example.mgc_keyboard.dashboard.screens.SetPinScreen
 import com.example.mgc_keyboard.dashboard.screens.SettingsScreen
 import com.example.mgc_keyboard.dashboard.screens.TrendsScreen
 import com.example.mgc_keyboard.dashboard.screens.VerifyPinScreen
-import com.example.mgc_keyboard.dashboard.screens.WeeklySummaryScreen
 import com.example.mgc_keyboard.statscore.AuditEventType
 import com.example.mgc_keyboard.statscore.StatsDatabase
 import com.example.mgc_keyboard.statscore.StatsRepository
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 object MelookRoutes {
     const val SPLASH = "splash"
@@ -69,8 +73,21 @@ object MelookRoutes {
     const val TRENDS = "trends"
     const val SETTINGS = "settings"
     const val DATA_SHARING = "data_sharing"
-    const val ALL_STATS = "all_stats"
+    const val METRICS = "metrics"
+    const val METRIC_DETAIL = "metric/{key}"
     const val CUSTOMIZE = "customize"
+
+    fun metricDetail(key: String) = "metric/$key"
+}
+
+/** Tab switches must not stack: without this, four taps around the bottom bar leave four
+ * entries on the back stack and the back gesture walks the tab history instead of leaving. */
+private fun navigateTab(navController: NavHostController, route: String) {
+    navController.navigate(route) {
+        popUpTo(MelookRoutes.SUMMARY) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
 }
 
 /**
@@ -211,61 +228,63 @@ fun MelookNavHost(navController: NavHostController = rememberNavController()) {
         composable(MelookRoutes.SUMMARY) {
             val state by dashboardViewModel.state.collectAsState()
             val prefs by prefsStore.state.collectAsState(initial = null)
-            Box(Modifier.fillMaxSize()) {
-                WeeklySummaryScreen(
-                    hasBaseline = state.hasBaseline,
-                    paceChangePercent = state.paceChangePercent,
-                    weekBars = state.weekBars,
-                    lateNightChangePercent = state.lateNightChangePercent,
-                    appVarietyLower = state.appVarietyLower,
-                    showSuggestion = state.showSuggestion,
-                    collectedToday = state.collectedToday,
-                    displayName = prefs?.displayName ?: "there",
-                    onNext = { navController.navigate(MelookRoutes.TRENDS) }
-                )
-                // Theme lives in Settings > Customize only; no shortcut here.
-                // These icons sit in a bare Box, so LocalContentColor would default to
-                // black and vanish against the dark-theme surface — tint explicitly.
-                Row(modifier = Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 8.dp)) {
-                    IconButton(onClick = { navController.navigate(MelookRoutes.ALL_STATS) }) {
-                        Icon(Icons.Default.Insights, contentDescription = "Everything we track", tint = MelookColors.TextDark)
-                    }
-                    IconButton(onClick = { navController.navigate(MelookRoutes.SETTINGS) }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MelookColors.TextDark)
-                    }
-                }
-            }
+            // Once per calendar day, not once per visit: the Home tab is re-entered constantly
+            // and a modal that reopens every time is a modal people learn to dismiss unread.
+            val today = LocalDate.now().toEpochDay()
+            val showRiskDialog = prefs != null && prefs?.riskDialogShownDay != today
+            HomeScreen(
+                metrics = state.metrics,
+                daysOfDataCollected = state.daysOfDataCollected,
+                collectedToday = state.collectedToday,
+                currentHour = state.currentHour,
+                showRiskDialog = showRiskDialog,
+                onRiskDialogDismissed = { scope.launch { prefsStore.setRiskDialogShownDay(today) } },
+                onOpenMetric = { key -> navController.navigate(MelookRoutes.metricDetail(key)) },
+                onOpenMetrics = { navigateTab(navController, MelookRoutes.METRICS) },
+                bottomBar = { MelookBottomBar(MelookTab.HOME) { tab -> navigateTab(navController, tab.route) } }
+            )
         }
         composable(MelookRoutes.TRENDS) {
             val state by dashboardViewModel.state.collectAsState()
-            Box(Modifier.fillMaxSize()) {
-                TrendsScreen(
-                    hasEnoughWeeksForTrend = state.hasEnoughWeeksForTrend,
-                    trendPoints = state.trendPoints.ifEmpty { listOf(com.example.mgc_keyboard.dashboard.charts.ChartPoint(0.5f)) },
-                    trendDirectionLabel = state.trendDirectionLabel,
-                    quietStretchHours = state.quietStretchHours,
-                    quietStretchIncreased = state.quietStretchIncreased,
-                    daysOfDataCollected = state.daysOfDataCollected,
-                    onNext = {
-                        navController.navigate(MelookRoutes.SUMMARY) {
-                            popUpTo(MelookRoutes.SUMMARY) { inclusive = true }
-                        }
-                    }
-                )
-                IconButton(
-                    onClick = { navController.navigate(MelookRoutes.SETTINGS) },
-                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 8.dp)
-                ) {
-                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MelookColors.TextDark)
-                }
-            }
+            TrendsScreen(
+                hasEnoughWeeksForTrend = state.hasEnoughWeeksForTrend,
+                trendPoints = state.trendPoints.ifEmpty { listOf(com.example.mgc_keyboard.dashboard.charts.ChartPoint(0.5f)) },
+                trendDirectionLabel = state.trendDirectionLabel,
+                quietStretchHours = state.quietStretchHours,
+                quietStretchIncreased = state.quietStretchIncreased,
+                daysOfDataCollected = state.daysOfDataCollected,
+                onOpenMetric = { key -> navController.navigate(MelookRoutes.metricDetail(key)) },
+                bottomBar = { MelookBottomBar(MelookTab.TRENDS) { tab -> navigateTab(navController, tab.route) } }
+            )
+        }
+        composable(MelookRoutes.METRICS) {
+            val state by dashboardViewModel.state.collectAsState()
+            MetricsScreen(
+                metrics = state.metrics,
+                heatmapDays = state.heatmapDays,
+                daysOfDataCollected = state.daysOfDataCollected,
+                onOpenMetric = { key -> navController.navigate(MelookRoutes.metricDetail(key)) },
+                bottomBar = { MelookBottomBar(MelookTab.METRICS) { tab -> navigateTab(navController, tab.route) } }
+            )
+        }
+        composable(MelookRoutes.METRIC_DETAIL) { entry ->
+            val state by dashboardViewModel.state.collectAsState()
+            val key = entry.arguments?.getString("key").orEmpty()
+            MetricDetailScreen(
+                metricKey = key,
+                metric = state.metrics.firstOrNull { it.key == key },
+                heatmapDays = state.heatmapDays,
+                hourlyActivityPattern = state.hourlyActivityPattern,
+                dailyActivityPatternMonth = state.dailyActivityPatternMonth,
+                onBack = { navController.popBackStack() }
+            )
         }
         composable(MelookRoutes.SETTINGS) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onOpenPrivacy = { navController.navigate(MelookRoutes.PRIVACY_INFO) },
                 onOpenDataSharing = { navController.navigate(MelookRoutes.DATA_SHARING) },
-                onOpenAllStats = { navController.navigate(MelookRoutes.ALL_STATS) },
+                onOpenAllStats = { navigateTab(navController, MelookRoutes.METRICS) },
                 onOpenCustomize = { navController.navigate(MelookRoutes.CUSTOMIZE) }
             )
         }
@@ -273,23 +292,6 @@ fun MelookNavHost(navController: NavHostController = rememberNavController()) {
             val bridgePrefsStore = remember { com.example.mgc_keyboard.dashboard.bridge.ClinicalBridgePreferences(context) }
             val bridgeState by bridgePrefsStore.state.collectAsState(initial = com.example.mgc_keyboard.dashboard.bridge.ClinicalBridgeState())
             DataSharingScreen(bridgeState = bridgeState, onBack = { navController.popBackStack() })
-        }
-        composable(MelookRoutes.ALL_STATS) {
-            val state by dashboardViewModel.state.collectAsState()
-            AllStatsScreen(
-                hourlyActivityPattern = state.hourlyActivityPattern,
-                dailyActivityPatternMonth = state.dailyActivityPatternMonth,
-                backspaceRateBars = state.backspaceRateBars,
-                sentimentTrendRecent = state.sentimentTrendRecent,
-                appSwitchBars = state.appSwitchBars,
-                appVarietyBars = state.appVarietyBars,
-                heatmapDays = state.heatmapDays,
-                totalKeyPressesToday = state.totalKeyPressesToday,
-                totalBackspacesToday = state.totalBackspacesToday,
-                totalWordsScoredToday = state.totalWordsScoredToday,
-                currentHour = state.currentHour,
-                onBack = { navController.popBackStack() }
-            )
         }
         composable(MelookRoutes.CUSTOMIZE) {
             val prefs by prefsStore.state.collectAsState(initial = null)
