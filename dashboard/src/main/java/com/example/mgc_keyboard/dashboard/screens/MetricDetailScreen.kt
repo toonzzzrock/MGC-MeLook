@@ -81,10 +81,11 @@ fun MetricDetailScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back to metrics", tint = MelookColors.TextDark)
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MelookColors.TextDark)
             }
+            // No breadcrumb: this page opens from Home, Trends and Metrics alike, and a fixed
+            // "Metrics" label would name a screen the back arrow is not going to.
             Column(Modifier.weight(1f)) {
-                Text("Metrics", color = MelookColors.TextFaint, fontSize = 12.sp)
                 Text(title, color = MelookColors.TextDark, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
             }
         }

@@ -49,6 +49,18 @@ data class MetricSnapshot(
 )
 
 /**
+ * Truncates every earlier day to the hour of day the last day has reached, so a total that
+ * accumulates through the day is compared against the same slice of earlier days. Without it a
+ * part-day "today" reads far below every full day all morning, and app variety — where a drop is
+ * the worry — would raise a risk every day before noon purely because the day is not over.
+ * Ratio metrics (backspace share, mean sentiment) do not accumulate and are left alone.
+ */
+internal fun <T> alignToPartialDay(daysAsc: List<List<T>>, hourOfDay: (T) -> Int): List<List<T>> {
+    val cutoff = daysAsc.lastOrNull()?.maxOfOrNull(hourOfDay) ?: return daysAsc
+    return daysAsc.map { day -> day.filter { hourOfDay(it) <= cutoff } }
+}
+
+/**
  * Builds a snapshot from an ascending per-day series. Today is the last entry; the mean and
  * spread come from every earlier day in the window, so today is compared against a baseline it
  * is not itself part of. Returns null when there are too few earlier days to say anything.

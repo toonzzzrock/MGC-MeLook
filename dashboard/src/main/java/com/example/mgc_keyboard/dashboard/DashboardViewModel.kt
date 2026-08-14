@@ -112,6 +112,15 @@ private fun buildMetrics(byDay: Map<Long, List<HourlyStat>>): List<MetricSnapsho
     fun series(value: (List<HourlyStat>) -> Float?): List<Pair<String, Float>> =
         daysAsc.mapNotNull { day -> value(day)?.let { day.weekdayLabel() to it } }
 
+    /** For daily totals: earlier days cut to the hour today has reached, so a part-day total is
+     * not read as a drop. See [alignToPartialDay]. */
+    val alignedDaysAsc = alignToPartialDay(daysAsc) { (it.hourBucket % 24).toInt() }
+
+    fun runningTotal(value: (List<HourlyStat>) -> Float?): List<Pair<String, Float>> =
+        alignedDaysAsc.mapNotNull { day ->
+            if (day.isEmpty()) null else value(day)?.let { day.weekdayLabel() to it }
+        }
+
     val metrics = listOfNotNull(
         metricFrom(
             key = MetricKeys.SENTIMENT,
@@ -131,25 +140,25 @@ private fun buildMetrics(byDay: Map<Long, List<HourlyStat>>): List<MetricSnapsho
         metricFrom(
             key = MetricKeys.SCREEN_TIME,
             name = "Screen-on time",
-            series = series { day -> (day.sumOf { it.screenTimeMillis } / 60_000f).takeIf { it > 0f } },
+            series = runningTotal { day -> (day.sumOf { it.screenTimeMillis } / 60_000f).takeIf { it > 0f } },
             format = { formatMinutes(it) },
             deltaFormat = { formatMinutes(it) },
             higherIsConcerning = true,
             unitCaption = "Total time the screen was on, per day",
             sourceLabel = "Place et al., 2017",
-            howMeasured = "Screen-on time is summed per hour from the system usage tracker, then totalled per calendar day.",
+            howMeasured = "Screen-on time is summed per hour from the system usage tracker, then totalled per calendar day. Earlier days are cut off at the same time of day as now, so a day still in progress is not read as a drop.",
             info = ChartCitations.PHONE_SCHEDULE
         ),
         metricFrom(
             key = MetricKeys.APP_SWITCHING,
             name = "App switching",
-            series = series { day -> day.sumOf { it.appSwitchCount }.toFloat() },
+            series = runningTotal { day -> day.sumOf { it.appSwitchCount }.toFloat() },
             format = { "${it.toInt()}" },
             deltaFormat = { "${it.toInt()}" },
             higherIsConcerning = true,
             unitCaption = "Times you moved between apps, per day",
             sourceLabel = "Rozgonjuk et al., 2021",
-            howMeasured = "Each time the foreground app changes it is counted once, and the counts are totalled per day.",
+            howMeasured = "Each time the foreground app changes it is counted once, and the counts are totalled per day. Earlier days are cut off at the same time of day as now, so a day still in progress is not read as a drop.",
             info = ChartCitations.APP_SWITCHING
         ),
         metricFrom(
@@ -170,25 +179,25 @@ private fun buildMetrics(byDay: Map<Long, List<HourlyStat>>): List<MetricSnapsho
         metricFrom(
             key = MetricKeys.APP_VARIETY,
             name = "App variety",
-            series = series { day -> day.sumOf { it.distinctAppCount }.toFloat() },
+            series = runningTotal { day -> day.sumOf { it.distinctAppCount }.toFloat() },
             format = { "${it.toInt()}" },
             deltaFormat = { "${it.toInt()}" },
             higherIsConcerning = false,
             unitCaption = "Distinct apps opened, per day",
             sourceLabel = "Saeb et al., 2015",
-            howMeasured = "Distinct apps seen in each hour, totalled per day. A narrowing set of apps is the withdrawal signal this tracks.",
+            howMeasured = "Distinct apps seen in each hour, totalled per day. A narrowing set of apps is the withdrawal signal this tracks. Earlier days are cut off at the same time of day as now, so a day still in progress is not read as a drop.",
             info = ChartCitations.APP_VARIETY
         ),
         metricFrom(
             key = MetricKeys.QUIET,
             name = "Quiet stretches",
-            series = series { day -> day.count { it.isInactive() }.toFloat() },
+            series = runningTotal { day -> day.count { it.isInactive() }.toFloat() },
             format = { "${it.toInt()}h" },
             deltaFormat = { "${it.toInt()}h" },
             higherIsConcerning = true,
             unitCaption = "Hours with no typing and no screen time",
             sourceLabel = "Place et al., 2017",
-            howMeasured = "An hour counts as quiet when it recorded no key presses and no screen-on time. This counts those hours per day.",
+            howMeasured = "An hour counts as quiet when it recorded no key presses and no screen-on time. This counts those hours per day. Earlier days are cut off at the same time of day as now, so a day still in progress is not read as a drop.",
             info = ChartCitations.PHONE_SCHEDULE
         )
     )

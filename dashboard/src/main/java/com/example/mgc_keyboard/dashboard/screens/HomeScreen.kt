@@ -89,7 +89,9 @@ fun HomeScreen(
             ScreenHeader(
                 title = "Home",
                 caption = if (metrics.isEmpty()) "$daysOfDataCollected days collected so far"
-                else "Today against your own ${metrics.first().daysCompared}-day average"
+                // Smallest window across the signals, not the first row's: every metric drops its
+                // own no-data days, so quoting one row's count overstates the rest.
+                else "Today against your own average of ${metrics.minOf { it.daysCompared }}+ earlier days"
             )
             Column(Modifier.padding(horizontal = 20.dp)) {
 

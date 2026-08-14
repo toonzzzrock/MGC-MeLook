@@ -69,6 +69,46 @@ class MetricSnapshotTest {
     }
 
     @Test
+    fun `earlier days are cut to the hour today has reached`() {
+        // Six full days of hours 0..23, today only up to hour 9.
+        val days = List(6) { (0..23).toList() } + listOf((0..9).toList())
+        val aligned = alignToPartialDay(days) { it }
+        assertEquals(List(7) { 10 }, aligned.map { it.size })
+    }
+
+    @Test
+    fun `a part-day total does not read as a drop once aligned`() {
+        // Six full days: 3 or 4 apps by 9am, 7 more over the afternoon. Today is 9am, 3 apps —
+        // an ordinary morning, but a collapse if measured against whole days.
+        fun day(index: Int) = (0..23).map { hour ->
+            hour to when {
+                hour < 10 -> if (hour < 3 + index % 2) 1 else 0
+                hour == 10 -> 7
+                else -> 0
+            }
+        }
+        val days = List(6) { day(it) } + listOf(day(0).take(10))
+        fun totals(input: List<List<Pair<Int, Int>>>) =
+            input.map { "Mon" to it.sumOf { (_, apps) -> apps }.toFloat() }
+
+        val unaligned = metricFrom(
+            key = "k", name = "App variety", series = totals(days),
+            format = { "${it.toInt()}" }, deltaFormat = { "${it.toInt()}" },
+            higherIsConcerning = false, unitCaption = "", sourceLabel = "",
+            howMeasured = "", info = ChartCitations.APP_VARIETY
+        )
+        val aligned = metricFrom(
+            key = "k", name = "App variety", series = totals(alignToPartialDay(days) { it.first }),
+            format = { "${it.toInt()}" }, deltaFormat = { "${it.toInt()}" },
+            higherIsConcerning = false, unitCaption = "", sourceLabel = "",
+            howMeasured = "", info = ChartCitations.APP_VARIETY
+        )
+        assertTrue("unaligned morning should look like a collapse", unaligned!!.concerning)
+        assertFalse("aligned morning is an ordinary morning", aligned!!.concerning)
+        assertFalse(aligned.outsideUsualRange)
+    }
+
+    @Test
     fun `minutes format switches to hours past sixty`() {
         assertEquals("45m", formatMinutes(45f))
         assertEquals("2h 48m", formatMinutes(168f))
