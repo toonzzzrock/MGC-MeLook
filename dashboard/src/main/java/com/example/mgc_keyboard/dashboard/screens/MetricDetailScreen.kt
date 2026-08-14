@@ -159,10 +159,15 @@ fun MetricDetailScreen(
                     }
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        if (metric.outsideUsualRange)
-                            "Outside your usual range — further from your own average than a typical day's variation."
-                        else
-                            "Within your usual range — this size of change is normal day-to-day variation for you.",
+                        when {
+                            metric.outsideUsualRange ->
+                                "Outside your usual range — further from your own average than a typical day's variation."
+                            // Not "within range": too few hours are recorded to have tested it.
+                            metric.tooEarlyToJudge ->
+                                "Too early in the day to say — only the hours recorded so far are counted, and a few of them carry too little of your usual variation to compare against."
+                            else ->
+                                "Within your usual range — this size of change is normal day-to-day variation for you."
+                        },
                         color = if (metric.concerning) MelookColors.Negative else MelookColors.TextGray,
                         fontSize = 12.sp
                     )

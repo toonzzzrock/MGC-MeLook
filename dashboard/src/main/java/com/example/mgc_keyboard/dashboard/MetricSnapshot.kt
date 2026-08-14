@@ -36,6 +36,9 @@ data class MetricSnapshot(
     val outsideUsualRange: Boolean,
     /** Outside the range *and* moved in the direction the literature associates with symptoms. */
     val concerning: Boolean,
+    /** Too few hours of the day recorded to judge a running total either way. Distinct from
+     * "within range": the screens must not call it normal variation when nothing was tested. */
+    val tooEarlyToJudge: Boolean,
     /** Distance from the user's mean in standard deviations — what Home orders rows by. */
     val deviations: Float,
     val daysCompared: Int,
@@ -94,12 +97,14 @@ internal fun metricFrom(
     val sd = sqrt(prior.map { (it - mean) * (it - mean) }.average()).toFloat()
     val delta = today - mean
     // A flat series (sd == 0) would flag any change at all as unusual, so it stays unflagged.
-    val deviations = if (sd > 0f) abs(delta) / sd else 0f
+    val enoughOfTheDay = partialDayHours == null || partialDayHours >= MIN_HOURS_TO_FLAG
+    // Zero while the day is too young: this is the key Home orders rows by, and a thin window's
+    // inflated distance would still rank a non-finding at the top of an urgency-ordered page.
+    val deviations = if (sd > 0f && enoughOfTheDay) abs(delta) / sd else 0f
     // A few hours of a running total carry almost no spread, so an ordinary first coffee can sit
     // several deviations above a near-zero mean. Aligned totals only get to claim "unusual" once
     // enough of the day is behind them; the number itself still shows from the first hour.
-    val enoughOfTheDay = partialDayHours == null || partialDayHours >= MIN_HOURS_TO_FLAG
-    val outside = prior.size >= 5 && sd > 0f && deviations > 1f && enoughOfTheDay
+    val outside = prior.size >= 5 && sd > 0f && deviations > 1f
     val higher = delta >= 0f
     val concerning = outside && (higher == higherIsConcerning)
 
@@ -125,6 +130,7 @@ internal fun metricFrom(
         higher = higher,
         outsideUsualRange = outside,
         concerning = concerning,
+        tooEarlyToJudge = !enoughOfTheDay,
         deviations = deviations,
         daysCompared = prior.size,
         baselineCaption = if (partialDayHours == null) "${prior.size}-day average"

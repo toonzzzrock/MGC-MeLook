@@ -122,6 +122,12 @@ class MetricSnapshotTest {
         assertTrue("without the hour guard the morning flags", snap(null).concerning)
         assertFalse(snap(2).outsideUsualRange)
         assertFalse(snap(2).concerning)
+        // Home ranks by deviations, so a held-back metric must not still sort to the top.
+        assertEquals(0f, snap(2).deviations, 0f)
+        // And it must not read as "within your usual range" either — nothing was tested.
+        assertTrue(snap(2).tooEarlyToJudge)
+        assertFalse(snap(MIN_HOURS_TO_FLAG).tooEarlyToJudge)
+        assertTrue(snap(MIN_HOURS_TO_FLAG).deviations > 1f)
         // The number itself is unaffected; only the claim about it is held back.
         assertEquals("3", snap(2).todayLabel)
         // Past the threshold the rule applies again.
