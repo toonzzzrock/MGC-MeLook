@@ -2,6 +2,7 @@ package com.example.mgc_keyboard.dashboard.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +26,7 @@ import com.example.mgc_keyboard.dashboard.MetricSnapshot
 import com.example.mgc_keyboard.dashboard.charts.ChartCitations
 import com.example.mgc_keyboard.dashboard.charts.ChartInfoDot
 import com.example.mgc_keyboard.dashboard.charts.HeatmapDay
+import com.example.mgc_keyboard.dashboard.charts.RangeStrip
 import com.example.mgc_keyboard.dashboard.charts.heatmapWeekSpan
 
 /**
@@ -44,7 +46,7 @@ fun MetricsScreen(
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             ScreenHeader(
                 title = "Metrics",
-                caption = "Tap a row for the chart and method · ⓘ for the source"
+                caption = "Shaded band is your usual range · the dot is today"
             )
             Column(Modifier.padding(horizontal = 20.dp)) {
                 if (metrics.isEmpty()) {
@@ -64,31 +66,42 @@ fun MetricsScreen(
                             if (index > 0) {
                                 Spacer(Modifier.fillMaxWidth().height(1.dp).background(MelookColors.Border))
                             }
-                            Row(
+                            // Name and today's figure on one line, the strip under it: where the
+                            // dot sits against the band is the reading, so the row needs no prose
+                            // and the source can stay on the detail page where it is explained.
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable { onOpenMetric(metric.key) }
-                                    .padding(vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    // Rows outside the usual range carry a tint and a marker, so
+                                    // the ones worth reading are found without scanning numbers.
+                                    .background(if (metric.concerning) MelookColors.WarnSurface else MelookColors.Surface)
+                                    .padding(vertical = 12.dp, horizontal = if (metric.concerning) 10.dp else 0.dp)
                             ) {
-                                Column(Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(metric.name, color = MelookColors.TextDark, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                        ChartInfoDot(metric.info)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (metric.concerning) {
+                                        Text("● ", color = MelookColors.SeriesFlagged, fontSize = 11.sp)
                                     }
-                                    Spacer(Modifier.height(2.dp))
-                                    Text(metric.unitCaption, color = MelookColors.TextGray, fontSize = 12.sp)
-                                    Text("Source: ${metric.sourceLabel}", color = MelookColors.TextFaint, fontSize = 11.sp)
-                                }
-                                Column(
-                                    modifier = Modifier.width(78.dp),
-                                    horizontalAlignment = Alignment.End
-                                ) {
+                                    Text(metric.name, color = MelookColors.TextDark, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                    ChartInfoDot(metric.info)
+                                    Spacer(Modifier.weight(1f))
                                     Text(metric.todayLabel, color = MelookColors.TextDark, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                                    DeltaText(metric.deltaLabel, metric.concerning, metric.outsideUsualRange, fontSize = 12)
+                                    Spacer(Modifier.width(6.dp))
+                                    RowChevron()
                                 }
-                                Spacer(Modifier.width(6.dp))
-                                RowChevron()
+                                Spacer(Modifier.height(6.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    RangeStrip(
+                                        range = metric.usualRange,
+                                        concerning = metric.concerning,
+                                        outsideUsualRange = metric.outsideUsualRange,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Spacer(Modifier.width(10.dp))
+                                    Box(Modifier.width(70.dp)) {
+                                        DeltaText(metric.deltaLabel, metric.concerning, metric.outsideUsualRange, fontSize = 12)
+                                    }
+                                }
                             }
                         }
                     }

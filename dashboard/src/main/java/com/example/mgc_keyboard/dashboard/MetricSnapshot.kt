@@ -18,6 +18,17 @@ object MetricKeys {
 }
 
 /**
+ * Where today sits on the user's own scale, as fractions of a 0..1 strip: the band is their usual
+ * range (one standard deviation either side of their mean), the marker is today. Lets a row answer
+ * "is this normal for me" without opening anything.
+ */
+data class UsualRange(
+    val bandStart: Float,
+    val bandEnd: Float,
+    val today: Float
+)
+
+/**
  * One tracked signal, today's value next to the user's own recent average, with everything the
  * reading screens need: the number, the comparison, the source line, and the chart series.
  *
@@ -50,6 +61,7 @@ data class MetricSnapshot(
     val howMeasured: String,
     val plainReading: String,
     val info: ChartInfo,
+    val usualRange: UsualRange,
     val bars: List<Bar> = emptyList(),
     val points: List<ChartPoint> = emptyList()
 )
@@ -143,9 +155,26 @@ internal fun metricFrom(
         else
             "${format(today)} so far today vs ${format(mean)} by this time on your last ${prior.size} days",
         info = info,
+        usualRange = usualRange(prior, today, mean, sd),
         bars = bars,
         points = points
     )
+}
+
+/**
+ * Positions the usual-range band and today's marker on a shared 0..1 strip. The strip spans
+ * everything the user has actually done in the window plus the band itself, so today always lands
+ * inside the drawing whether it sits in the band, at an edge, or well past one.
+ */
+private fun usualRange(prior: List<Float>, today: Float, mean: Float, sd: Float): UsualRange {
+    val low = minOf(prior.minOrNull() ?: today, today, mean - sd)
+    val high = maxOf(prior.maxOrNull() ?: today, today, mean + sd)
+    val span = high - low
+    // One value repeated, or a single day: centre the band and put today on it rather than
+    // dividing by zero and drawing a strip that means nothing.
+    if (span <= 0f) return UsualRange(bandStart = 0.4f, bandEnd = 0.6f, today = 0.5f)
+    fun at(value: Float) = ((value - low) / span).coerceIn(0f, 1f)
+    return UsualRange(bandStart = at(mean - sd), bandEnd = at(mean + sd), today = at(today))
 }
 
 fun formatMinutes(minutes: Float): String {

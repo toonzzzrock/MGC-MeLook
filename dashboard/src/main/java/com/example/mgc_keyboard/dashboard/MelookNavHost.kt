@@ -248,10 +248,7 @@ fun MelookNavHost(navController: NavHostController = rememberNavController()) {
             val state by dashboardViewModel.state.collectAsState()
             TrendsScreen(
                 hasEnoughWeeksForTrend = state.hasEnoughWeeksForTrend,
-                trendPoints = state.trendPoints.ifEmpty { listOf(com.example.mgc_keyboard.dashboard.charts.ChartPoint(0.5f)) },
-                trendDirectionLabel = state.trendDirectionLabel,
-                quietStretchHours = state.quietStretchHours,
-                quietStretchIncreased = state.quietStretchIncreased,
+                trends = state.trends,
                 daysOfDataCollected = state.daysOfDataCollected,
                 onOpenMetric = { key -> navController.navigate(MelookRoutes.metricDetail(key)) },
                 bottomBar = { MelookBottomBar(MelookTab.TRENDS) { tab -> navigateTab(navController, tab.route) } }

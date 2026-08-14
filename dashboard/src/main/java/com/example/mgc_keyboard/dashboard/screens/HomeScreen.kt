@@ -113,39 +113,6 @@ fun HomeScreen(
                         Spacer(Modifier.height(16.dp))
                     }
 
-                    SectionLabel("TODAY VS YOUR AVERAGE")
-                    SectionCard {
-                        Row(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                            Text("Signal", color = MelookColors.TextFaint, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                            Text("Today", color = MelookColors.TextFaint, fontSize = 11.sp, modifier = Modifier.width(74.dp))
-                            Text("Change", color = MelookColors.TextFaint, fontSize = 11.sp, modifier = Modifier.width(64.dp))
-                            Spacer(Modifier.width(14.dp))
-                        }
-                        metrics.forEach { metric ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onOpenMetric(metric.key) }
-                                    .padding(vertical = 9.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                                    Text(metric.name, color = MelookColors.TextDark, fontSize = 13.sp)
-                                    ChartInfoDot(metric.info)
-                                }
-                                Column(Modifier.width(74.dp)) {
-                                    Text(metric.todayLabel, color = MelookColors.TextDark, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                    Text("was ${metric.baselineLabel}", color = MelookColors.TextFaint, fontSize = 11.sp)
-                                }
-                                Column(Modifier.width(64.dp)) {
-                                    DeltaText(metric.deltaLabel, metric.concerning, metric.outsideUsualRange)
-                                }
-                                RowChevron()
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(16.dp))
-
                     SectionLabel("SUGGESTED NOW")
                     SectionCard(modifier = Modifier.clickable { showWindDown = true }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -167,6 +134,64 @@ fun HomeScreen(
                         }
                     }
                     Spacer(Modifier.height(16.dp))
+
+                    // Home carries only what moved. The full list of signals is the Metrics tab's
+                    // job, and repeating it here left that tab with nothing of its own to do.
+                    val movers = metrics.filter { it.outsideUsualRange }
+                    SectionLabel(if (movers.isEmpty()) "TODAY" else "WHAT MOVED TODAY")
+                    SectionCard {
+                        if (movers.isEmpty()) {
+                            Text(
+                                "All ${metrics.size} signals are within your usual range today.",
+                                color = MelookColors.TextDark,
+                                fontSize = 14.sp
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Nothing sat further from your own average than an ordinary day's variation.",
+                                color = MelookColors.TextGray,
+                                fontSize = 12.sp
+                            )
+                        } else {
+                        Row(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                            Text("Signal", color = MelookColors.TextFaint, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            Text("Today", color = MelookColors.TextFaint, fontSize = 11.sp, modifier = Modifier.width(74.dp))
+                            Text("Change", color = MelookColors.TextFaint, fontSize = 11.sp, modifier = Modifier.width(64.dp))
+                            Spacer(Modifier.width(14.dp))
+                        }
+                        movers.forEach { metric ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onOpenMetric(metric.key) }
+                                    .padding(vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(metric.name, color = MelookColors.TextDark, fontSize = 13.sp)
+                                    ChartInfoDot(metric.info)
+                                }
+                                Column(Modifier.width(74.dp)) {
+                                    Text(metric.todayLabel, color = MelookColors.TextDark, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                    Text("was ${metric.baselineLabel}", color = MelookColors.TextFaint, fontSize = 11.sp)
+                                }
+                                Column(Modifier.width(64.dp)) {
+                                    DeltaText(metric.deltaLabel, metric.concerning, metric.outsideUsualRange)
+                                }
+                                RowChevron()
+                            }
+                        }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            "See all ${metrics.size} signals ›",
+                            color = MelookColors.Accent,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.clickable { onOpenMetrics() }
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
                 }
 
                 SectionLabel("DATA COLLECTED")
@@ -183,14 +208,6 @@ fun HomeScreen(
                         if (currentHour.asOfMillis > 0)
                             SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(currentHour.asOfMillis))
                         else "—"
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        "See every signal ›",
-                        color = MelookColors.Accent,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.clickable { onOpenMetrics() }
                     )
                 }
 

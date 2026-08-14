@@ -150,6 +150,19 @@ class MetricSnapshotTest {
     }
 
     @Test
+    fun `the range strip puts today where the number says it is`() {
+        val steady = snapshot(listOf(5f, 5.2f, 4.8f, 5.1f, 5f, 4.9f, 9f))!!.usualRange
+        // Today is the highest value in the window, so it sits at the right-hand end, past a band
+        // that stays narrow around a steady history.
+        assertEquals(1f, steady.today, 0.001f)
+        assertTrue(steady.bandEnd < 0.5f)
+        assertTrue(steady.bandStart < steady.bandEnd)
+
+        val ordinary = snapshot(listOf(2f, 8f, 3f, 7f, 4f, 6f, 5f))!!.usualRange
+        assertTrue("an ordinary day sits on the band", ordinary.today in ordinary.bandStart..ordinary.bandEnd)
+    }
+
+    @Test
     fun `minutes format switches to hours past sixty`() {
         assertEquals("45m", formatMinutes(45f))
         assertEquals("2h 48m", formatMinutes(168f))

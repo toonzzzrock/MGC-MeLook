@@ -25,8 +25,53 @@ import com.example.mgc_keyboard.dashboard.MelookColors
 
 data class ChartPoint(
     val value: Float,
-    val label: String = ""
+    val label: String = "",
+    /** Day number within the charted window. Set it and the point is placed on a calendar axis,
+     * so a week with nothing recorded reads as a week-wide gap instead of one step. */
+    val dayOffset: Int? = null
 )
+
+/** Fraction of the plot width each point sits at: calendar position when the series carries day
+ * numbers, even steps otherwise. Draw and hit-test both go through this so they cannot disagree. */
+internal fun xFractions(points: List<ChartPoint>): List<Float> {
+    val even = points.indices.map { if (points.size < 2) 0f else it / (points.size - 1f) }
+    val days = points.map { it.dayOffset ?: return even }
+    val span = (days.last() - days.first()).toFloat()
+    if (span <= 0f) return even
+    return days.map { (it - days.first()) / span }
+}
+
+/** Keeps the first label, then every label at least [minGapPx] past the last one kept, and always
+ * the last. Two labels never overlap however unevenly the points are spread. */
+internal fun spacedLabelIndices(xs: List<Float>, minGapPx: Float): Set<Int> {
+    if (xs.isEmpty()) return emptySet()
+    val kept = mutableListOf(0)
+    for (i in 1 until xs.size) {
+        if (xs[i] - xs[kept.last()] >= minGapPx) kept += i
+    }
+    // The last point owns its label; drop whatever it would have collided with.
+    while (kept.size > 1 && xs.last() - xs[kept.last()] < minGapPx) kept.removeAt(kept.lastIndex)
+    kept += xs.lastIndex
+    return kept.toSet()
+}
+
+/** Point nearest the touch. Slot arithmetic would miss once points sit on a calendar axis, where
+ * a day after a long gap owns far more width than its neighbours. */
+internal fun nearestIndex(x: Float, totalWidth: Float, leftMargin: Float, points: List<ChartPoint>): Int {
+    if (points.isEmpty()) return 0
+    val plotWidth = (totalWidth - leftMargin).coerceAtLeast(1f)
+    val relative = ((x - leftMargin) / plotWidth).coerceIn(0f, 1f)
+    val fractions = xFractions(points)
+    return fractions.indices.minByOrNull { kotlin.math.abs(fractions[it] - relative) } ?: 0
+}
+
+/** True where a segment may be drawn: consecutive recorded days only. A gap in the data is left
+ * as a gap rather than bridged by a line that implies days nobody recorded. */
+private fun connected(points: List<ChartPoint>, i: Int): Boolean {
+    val a = points[i].dayOffset ?: return true
+    val b = points[i + 1].dayOffset ?: return true
+    return b - a == 1
+}
 
 @Composable
 fun LineChart(
@@ -34,6 +79,10 @@ fun LineChart(
     modifier: Modifier = Modifier,
     lineColor: Color = MelookColors.Accent,
     axisLabelColor: Color = MelookColors.TextGray,
+    /** Top of the value axis. Sentiment and other 0..1 scores keep the default. */
+    maxValue: Float = 1f,
+    /** The user's usual range in value units, shaded behind the line. */
+    band: ClosedFloatingPointRange<Float>? = null,
     valueFormatter: (Float) -> String = { it.formatAxisValue() },
     /** Axis ticks need to be short; the tooltip can afford prose. Defaults to the same text. */
     axisFormatter: (Float) -> String = valueFormatter
@@ -45,8 +94,7 @@ fun LineChart(
     val xLabelHeightPx = with(density) { 18.dp.toPx() }
     val tooltipAreaPx = with(density) { 26.dp.toPx() }
     val gutterPadPx = with(density) { 8.dp.toPx() }
-    // Line charts here are all on a 0..1 scale.
-    val ticks = remember { axisTickValues(1f) }
+    val ticks = remember(maxValue) { axisTickValues(maxValue) }
     // Measured, not a 30dp guess: the hit-testing below has to use the same left margin the
     // draw pass does, so it is computed once here rather than inside the Canvas.
     val yAxisWidthPx = remember(axisFormatter, axisLabelSizePx) {
@@ -62,15 +110,18 @@ fun LineChart(
                 awaitEachGesture {
                     val down = awaitFirstDown()
                     val pointerId = down.id
-                    selectedIndex = indexForX(down.position.x, size.width.toFloat(), yAxisWidthPx, points.size)
+                    selectedIndex = nearestIndex(down.position.x, size.width.toFloat(), yAxisWidthPx, points)
                     down.consume()
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == pointerId } ?: break
                         if (!change.pressed) break
-                        selectedIndex = indexForX(change.position.x, size.width.toFloat(), yAxisWidthPx, points.size)
+                        selectedIndex = nearestIndex(change.position.x, size.width.toFloat(), yAxisWidthPx, points)
                         change.consume()
                     }
+                    // Lift the finger and the reading goes with it, so no chart is left
+                    // wearing a tooltip from a tap the user has forgotten about.
+                    selectedIndex = null
                 }
             }
     ) {
@@ -84,8 +135,20 @@ fun LineChart(
         val plotHeight = plotBottom - plotTop
 
         val stepX = plotWidth / (points.size - 1)
+        val fractions = xFractions(points)
+        val scale = if (maxValue > 0f) maxValue else 1f
+        fun yFor(value: Float) = plotBottom - plotHeight * (value / scale).coerceIn(0f, 1f)
         val offsets = points.mapIndexed { i, p ->
-            Offset(plotLeft + i * stepX, plotBottom - plotHeight * p.value.coerceIn(0f, 1f))
+            Offset(plotLeft + plotWidth * fractions[i], yFor(p.value))
+        }
+
+        band?.let {
+            val top = yFor(it.endInclusive)
+            drawRect(
+                color = MelookColors.SeriesNeutral.copy(alpha = 0.16f),
+                topLeft = Offset(plotLeft, top),
+                size = androidx.compose.ui.geometry.Size(plotWidth, yFor(it.start) - top)
+            )
         }
 
         drawGridAndTicks(
@@ -99,43 +162,67 @@ fun LineChart(
             padPx = gutterPadPx
         )
 
-        val fill = Path().apply {
-            moveTo(offsets.first().x, plotBottom)
-            offsets.forEach { lineTo(it.x, it.y) }
-            lineTo(offsets.last().x, plotBottom)
-            close()
+        // Fill and stroke run per unbroken stretch of days, so a gap stays empty in both.
+        var runStart = 0
+        val runs = mutableListOf<IntRange>()
+        for (i in 0 until points.size - 1) {
+            if (!connected(points, i)) {
+                runs += runStart..i
+                runStart = i + 1
+            }
         }
-        drawPath(
-            path = fill,
-            brush = Brush.verticalGradient(
-                colors = listOf(lineColor.copy(alpha = 0.28f), Color.Transparent),
-                startY = plotTop,
-                endY = plotBottom
-            )
-        )
+        runs += runStart..points.lastIndex
 
-        for (i in 0 until offsets.size - 1) {
-            drawLine(
-                color = lineColor,
-                start = offsets[i],
-                end = offsets[i + 1],
-                strokeWidth = 5f,
-                cap = StrokeCap.Round
+        runs.filter { it.count() > 1 }.forEach { run ->
+            val runOffsets = offsets.slice(run)
+            val fill = Path().apply {
+                moveTo(runOffsets.first().x, plotBottom)
+                runOffsets.forEach { lineTo(it.x, it.y) }
+                lineTo(runOffsets.last().x, plotBottom)
+                close()
+            }
+            drawPath(
+                path = fill,
+                brush = Brush.verticalGradient(
+                    colors = listOf(lineColor.copy(alpha = 0.28f), Color.Transparent),
+                    startY = plotTop,
+                    endY = plotBottom
+                )
             )
+            for (i in 0 until runOffsets.size - 1) {
+                drawLine(
+                    color = lineColor,
+                    start = runOffsets[i],
+                    end = runOffsets[i + 1],
+                    strokeWidth = 5f,
+                    cap = StrokeCap.Round
+                )
+            }
         }
+        // A line of identical dots hides the days worth looking at. Days outside the user's usual
+        // range are marked, and the most recent day is ringed so "where am I now" needs no counting.
         offsets.forEachIndexed { i, p ->
             val isSelected = selectedIndex == i
-            drawCircle(color = lineColor, radius = if (isSelected) 9f else 6f, center = p)
+            val isLatest = i == offsets.lastIndex
+            val outside = band != null && points[i].value !in band
+            val dotColor = if (outside) MelookColors.SeriesFlagged else lineColor
+            if (isLatest) {
+                drawCircle(color = MelookColors.Surface, radius = 11f, center = p)
+                drawCircle(color = dotColor, radius = 11f, center = p, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f))
+            }
+            drawCircle(color = dotColor, radius = if (isSelected) 9f else if (outside || isLatest) 7f else 5f, center = p)
         }
 
         val labelPaint = axisTextPaint(axisLabelColor, axisLabelSizePx)
         val widestLabel = points.maxOf { labelPaint.measureText(it.label) }
-        val visible = visibleLabelIndices(points.size, stepX, widestLabel)
+        // Thinned by where the labels actually land, not by slot count: on a calendar axis a
+        // fortnight of daily points and a lone day after a gap sit at very different spacings.
+        val visible = spacedLabelIndices(offsets.map { it.x }, widestLabel * 1.2f)
         points.forEachIndexed { i, p ->
             if (p.label.isNotEmpty() && i in visible) {
                 drawContext.canvas.nativeCanvas.drawText(
                     p.label,
-                    (plotLeft + i * stepX).coerceIn(plotLeft, this.size.width - widestLabel / 2f),
+                    offsets[i].x.coerceIn(plotLeft, this.size.width - widestLabel / 2f),
                     this.size.height - 4f,
                     labelPaint
                 )

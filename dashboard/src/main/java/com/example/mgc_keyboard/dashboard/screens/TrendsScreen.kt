@@ -19,28 +19,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mgc_keyboard.dashboard.MelookColors
-import com.example.mgc_keyboard.dashboard.MetricKeys
-import com.example.mgc_keyboard.dashboard.charts.ChartCitations
+import com.example.mgc_keyboard.dashboard.TrendSeries
 import com.example.mgc_keyboard.dashboard.charts.ChartInfoDot
-import com.example.mgc_keyboard.dashboard.charts.ChartPoint
 import com.example.mgc_keyboard.dashboard.charts.LineChart
 import com.example.mgc_keyboard.dashboard.charts.sentimentAxisLabel
-import com.example.mgc_keyboard.dashboard.charts.sentimentLabel
-
-private val DEFAULT_TREND_POINTS = listOf(0.85f, 0.80f, 0.78f, 0.72f, 0.65f, 0.55f, 0.45f, 0.35f).map { ChartPoint(it) }
 
 /**
- * The long view: one line over every recorded day, against the direction label the ViewModel
- * derives from the same window. Day-to-day noise is what Home is for, so nothing here is
- * flagged as urgent — this screen exists to make a slow drift visible.
+ * The long view: every signal over every recorded day, each against the shaded band of the user's
+ * own usual range. Days with nothing recorded are gaps, not points — the axis is a calendar, so
+ * the shape of a line is the shape of time. Nothing here is flagged as urgent; Home covers today.
  */
 @Composable
 fun TrendsScreen(
     hasEnoughWeeksForTrend: Boolean = true,
-    trendPoints: List<ChartPoint> = DEFAULT_TREND_POINTS,
-    trendDirectionLabel: String = "about the same as usual",
-    quietStretchHours: Float = 3.1f,
-    quietStretchIncreased: Boolean = true,
+    trends: List<TrendSeries> = emptyList(),
     daysOfDataCollected: Int = 14,
     onOpenMetric: (String) -> Unit,
     bottomBar: @Composable () -> Unit
@@ -49,10 +41,10 @@ fun TrendsScreen(
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             ScreenHeader(
                 title = "Trends",
-                caption = "Typing sentiment across $daysOfDataCollected recorded days"
+                caption = "Every signal across $daysOfDataCollected recorded days · shaded band is your usual range"
             )
             Column(Modifier.padding(horizontal = 20.dp)) {
-                if (!hasEnoughWeeksForTrend) {
+                if (!hasEnoughWeeksForTrend || trends.isEmpty()) {
                     SectionCard {
                         Text("Not enough data yet", color = MelookColors.TextDark, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(6.dp))
@@ -63,53 +55,51 @@ fun TrendsScreen(
                         )
                     }
                 } else {
-                    SectionCard {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Typing sentiment", color = MelookColors.TextDark, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                            ChartInfoDot(ChartCitations.TRENDS_SENTIMENT)
-                        }
-                        Text("0 = negative, 1 = positive · one point per day", color = MelookColors.TextGray, fontSize = 12.sp)
-                        Spacer(Modifier.height(12.dp))
-                        LineChart(
-                            points = trendPoints,
-                            lineColor = MelookColors.SeriesNeutral,
-                            valueFormatter = { sentimentLabel(it) },
-                            axisFormatter = { sentimentAxisLabel(it) }
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        Text(
-                            "Last 7 days read $trendDirectionLabel, compared with your own earlier weeks.",
-                            color = MelookColors.TextGray,
-                            fontSize = 12.sp
-                        )
-                        Text("Source: Eichstaedt et al., 2018", color = MelookColors.TextFaint, fontSize = 11.sp)
+                    trends.forEach { trend ->
+                        TrendCard(trend, onOpenMetric)
+                        Spacer(Modifier.height(16.dp))
                     }
-                    Spacer(Modifier.height(16.dp))
-                }
-
-                SectionLabel("ALSO OVER THIS WINDOW")
-                SectionCard(modifier = Modifier.clickable { onOpenMetric(MetricKeys.QUIET) }) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Longest quiet stretch", color = MelookColors.TextDark, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                ChartInfoDot(ChartCitations.PHONE_SCHEDULE)
-                            }
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                "${quietStretchHours.toInt()} hours with no typing and no screen time — " +
-                                    if (quietStretchIncreased) "longer than your usual" else "in line with your usual",
-                                color = MelookColors.TextGray,
-                                fontSize = 12.sp
-                            )
-                        }
-                        RowChevron()
-                    }
+                    Text(
+                        "Today is left out of these lines: it is a part-day, and four of these signals " +
+                            "add up through the day. Home is where today is compared.",
+                        color = MelookColors.TextFaint,
+                        fontSize = 11.sp
+                    )
                 }
 
                 DisclaimerLine()
             }
         }
         bottomBar()
+    }
+}
+
+@Composable
+private fun TrendCard(trend: TrendSeries, onOpenMetric: (String) -> Unit) {
+    SectionCard(modifier = Modifier.clickable { onOpenMetric(trend.key) }) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(trend.name, color = MelookColors.TextDark, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            ChartInfoDot(trend.info)
+            Spacer(Modifier.fillMaxWidth().weight(1f))
+            RowChevron()
+        }
+        Text(trend.caption, color = MelookColors.TextGray, fontSize = 12.sp)
+        Spacer(Modifier.height(12.dp))
+        LineChart(
+            points = trend.points,
+            lineColor = MelookColors.SeriesNeutral,
+            maxValue = trend.maxValue,
+            band = trend.band,
+            valueFormatter = trend.format,
+            // Sentiment's axis reads as words; every other signal is already in its own unit.
+            axisFormatter = if (trend.maxValue == 1f) { v -> sentimentAxisLabel(v) } else trend.format
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(trend.summary, color = MelookColors.TextGray, fontSize = 12.sp)
+        Text(
+            "Ringed dot is the latest day · amber dots sat outside your usual range",
+            color = MelookColors.TextFaint,
+            fontSize = 11.sp
+        )
     }
 }

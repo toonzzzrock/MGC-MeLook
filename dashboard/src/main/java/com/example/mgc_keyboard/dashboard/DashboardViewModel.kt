@@ -86,8 +86,8 @@ data class DashboardUiState(
     val daysOfDataCollected: Int = 0,
     val collectedToday: CollectedToday = CollectedToday(0, "0m", 0, 0),
     val hasEnoughWeeksForTrend: Boolean = false,
-    val trendPoints: List<ChartPoint> = emptyList(),
-    val trendDirectionLabel: String = "",
+    /** One chart per signal over the long window, days spaced by date. */
+    val trends: List<TrendSeries> = emptyList(),
     val quietStretchHours: Float = 0f,
     val quietStretchIncreased: Boolean = false,
     // Screen-on time detail has 2 view modes sharing this data: hourly shape over the last 7
@@ -318,15 +318,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             daysOfDataCollected = byDay.size,
             collectedToday = collectedToday,
             hasEnoughWeeksForTrend = byDay.size >= 14,
-            trendPoints = if (byDay.size >= 14) {
-                byDay.entries.sortedBy { it.key }.map { (_, day) ->
-                    val score = day.mapNotNull { it.averageSentiment() }.average()
-                        .let { if (it.isNaN()) 0.5f else it.toFloat() }
-                        .coerceIn(0f, 1f)
-                    ChartPoint(value = score, label = day.dayMonthLabel())
-                }
-            } else emptyList(),
-            trendDirectionLabel = trendDirectionLabel(byDay, baseline),
+            // Built from the wide window, not the 14-day one the today-comparisons use: this is
+            // the screen that exists to make a slow drift visible.
+            trends = if (byDay.size >= 14) buildTrendSeries(heatmapHours.groupBy { it.dayBucket() }) else emptyList(),
             quietStretchHours = longestInactiveStretchHours.toFloat(),
             quietStretchIncreased = baseline != null && longestInactiveStretchHours > baseline.avgLongestInactiveStretchHours,
             hourlyActivityPattern = hourlyActivityPattern,
