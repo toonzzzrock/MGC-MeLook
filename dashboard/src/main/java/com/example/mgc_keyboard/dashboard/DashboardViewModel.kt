@@ -234,11 +234,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     init {
         combine(
-            repository.observeRecentHours(24 * 14),
+            repository.observeHoursSince(24 * 14),
             repository.observeBaseline(),
             // Wider, separate window purely for the heatmap so it doesn't distort the
             // 14-day-windowed metrics (trendPoints etc.) computed from the first flow.
-            repository.observeRecentHours(24 * 98)
+            repository.observeHoursSince(24 * 98)
         ) { recentHours, baseline, heatmapHours -> Triple(recentHours, baseline, heatmapHours) }
             .onEach { (recentHours, baseline, heatmapHours) -> update(recentHours, baseline, heatmapHours) }
             .launchIn(viewModelScope)

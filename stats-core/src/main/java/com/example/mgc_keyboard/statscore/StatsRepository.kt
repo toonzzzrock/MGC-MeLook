@@ -48,6 +48,13 @@ class StatsRepository(
     fun observeRecentHours(limit: Int): Flow<List<HourlyStat>> =
         dao.observeRecent(limit)
 
+    /** The last [hours] hours of the calendar, not the last [hours] rows that happen to exist.
+     * Recording has gaps, so a row limit silently reaches back weeks and a comparison ends up
+     * drawn against a different era of the user's life. The upper bound is open so hours
+     * recorded while the screen is up still arrive. */
+    fun observeHoursSince(hours: Int): Flow<List<HourlyStat>> =
+        dao.observeRange(windowStart(hours), Long.MAX_VALUE)
+
     suspend fun allHistory(): List<HourlyStat> = dao.getAll()
 
     fun observeBaseline(): Flow<BehavioralBaseline?> = baselineDao.observeLatest()
@@ -103,3 +110,6 @@ class StatsRepository(
         )
     }
 }
+
+/** First hour bucket inside a window of [hours] ending now. */
+fun windowStart(hours: Int, now: Long = currentHourBucket()): Long = now - hours + 1

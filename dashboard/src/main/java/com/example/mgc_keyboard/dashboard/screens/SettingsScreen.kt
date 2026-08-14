@@ -243,7 +243,10 @@ fun SettingsScreen(
         Text("TESTING", color = MelookColors.TextGray, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
         SettingsLinkRow(
-            title = if (isSeedingDemoData) "Loading demo data…" else "Load demo data (preview full dashboard)",
+            // Named for what it does rather than what it is for: the rows go into the same
+            // history every comparison reads, and there is no way to tell them apart afterwards.
+            title = if (isSeedingDemoData) "Loading demo data…"
+            else "Load demo data (writes 16 fake days into your history)",
             enabled = !isSeedingDemoData
         ) {
             isSeedingDemoData = true
